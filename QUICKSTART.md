@@ -56,15 +56,30 @@ This will:
 
 ## Step 4: Add Domains
 
+### Option A: Quick Test (Few Domains)
+
 ```bash
 # Add a few test domains
 python add_domains.py example.com github.com stackoverflow.com
 
-# Or from a file
+# Or from a text file
 echo "example.com" > domains.txt
 echo "github.com" >> domains.txt
 echo "stackoverflow.com" >> domains.txt
 python add_domains.py -f domains.txt
+```
+
+### Option B: Bulk Import (Hundreds/Thousands)
+
+```bash
+# Use sample CSV file
+python import_companies.py -f examples/domains_simple.csv --dry-run
+
+# If dry-run looks good, import for real
+python import_companies.py -f examples/domains_simple.csv
+
+# Or use your own CSV file
+python import_companies.py -f your_domains.csv
 ```
 
 ## Step 5: Run the Crawler
@@ -109,8 +124,14 @@ Press `Ctrl+C` to stop the crawler gracefully. It will:
 ### Add More Domains
 
 ```bash
-# Add thousands of domains from a CSV or text file
+# Small batch: text file
 python add_domains.py -f large_domain_list.txt
+
+# Large batch: CSV import (recommended for 1000+)
+python import_companies.py -f large_domains.csv --batch-size 5000
+
+# CSV import with validation preview
+python import_companies.py -f domains.csv --dry-run --verbose
 ```
 
 ### Schedule Regular Runs

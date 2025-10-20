@@ -1,0 +1,17 @@
+domain
+example.com
+https://github.com/some/path
+www.stackoverflow.com
+not-a-domain
+wikipedia.org
+http://reddit.com/
+invalid domain with spaces
+google
+amazon.com/products
+microsoft.com
+.invalid.com
+valid-domain.com
+sub.domain.example.com
+192.168.1.1
+-invalid.com
+valid.co.uk

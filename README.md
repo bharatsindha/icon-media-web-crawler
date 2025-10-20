@@ -175,13 +175,15 @@ Edit the `.env` file to customize:
 
 ### Adding Domains to Crawl
 
-Before running the crawler, add domains to the queue using `add_domains.py`:
+#### Method 1: Command Line / Text File (Small batches)
+
+Use `add_domains.py` for adding a few domains:
 
 ```bash
 # Add domains from command line
 python add_domains.py example.com google.com github.com
 
-# Add domains from a file
+# Add domains from a text file
 python add_domains.py -f domains.txt
 ```
 
@@ -192,6 +194,50 @@ github.com
 stackoverflow.com
 wikipedia.org
 ```
+
+#### Method 2: CSV Import (Large batches - Recommended)
+
+Use `import_companies.py` for importing hundreds or thousands of domains from CSV files:
+
+```bash
+# Basic import with auto-header detection
+python import_companies.py -f domains.csv
+
+# Dry run to preview without importing
+python import_companies.py -f domains.csv --dry-run
+
+# Import from specific column
+python import_companies.py -f domains.csv --column domain
+
+# Update existing domains to pending status
+python import_companies.py -f domains.csv --update-existing
+
+# High-performance batch import
+python import_companies.py -f large_domains.csv --batch-size 5000
+```
+
+CSV format options:
+```csv
+# Simple format with header
+domain
+example.com
+github.com
+
+# Multi-column format
+company,domain,status
+Example Inc,example.com,active
+GitHub,github.com,active
+```
+
+See [examples/](examples/) directory for sample CSV files.
+
+**Features:**
+- Auto-detects CSV header
+- Validates and normalizes domains
+- Batch inserts for performance
+- Handles duplicates gracefully
+- Dry-run mode for testing
+- Detailed import summary
 
 ### Basic Usage
 
@@ -233,15 +279,28 @@ web_crawler/
 ├── utils.py             # Utility functions (normalization, rate limiting)
 ├── config.py            # Configuration management
 ├── migrate.py           # Database migration manager
-├── add_domains.py       # Utility to add domains to crawl queue
+├── add_domains.py       # Add domains via CLI or text file
+├── import_companies.py  # Import domains from CSV files (bulk)
 ├── check_status.py      # Status monitoring and statistics
+├── cleanup_db.py        # Database cleanup utility
 ├── requirements.txt     # Python dependencies
 ├── .env.example         # Environment variables template
 ├── .env                 # Your local configuration (not in git)
 ├── .gitignore           # Git ignore rules
+├── QUICKSTART.md        # Quick start guide
+├── INSTALL.md           # Installation instructions
 ├── migrations/          # Database migration scripts
 │   ├── 001_create_tables.sql
-│   └── 002_seed_data.sql
+│   ├── 001_create_tables_down.sql
+│   ├── 002_seed_data.sql
+│   ├── 002_seed_data_down.sql
+│   └── README.md
+├── examples/            # Sample CSV files for import
+│   ├── domains_simple.csv
+│   ├── domains_no_header.csv
+│   ├── domains_multi_column.csv
+│   ├── domains_mixed.csv
+│   └── README.md
 ├── logs/                # Log files (created automatically)
 └── README.md            # This file
 ```
