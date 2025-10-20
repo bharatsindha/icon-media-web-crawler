@@ -175,14 +175,18 @@ def check_robots_txt(url: str, user_agent: str) -> bool:
 
 def extract_keywords_from_text(text: str, min_length: int = 2) -> Set[str]:
     """
-    Extract individual keywords from text.
+    Extract individual keywords from text, preserving original text.
+
+    This function extracts keywords while preserving special characters
+    and original capitalization. Normalization happens later in the
+    database layer to separate original from normalized keywords.
 
     Args:
         text: Text to extract keywords from
         min_length: Minimum keyword length
 
     Returns:
-        Set of normalized keywords
+        Set of original keywords (not normalized)
     """
     if not text:
         return set()
@@ -190,12 +194,17 @@ def extract_keywords_from_text(text: str, min_length: int = 2) -> Set[str]:
     keywords = set()
 
     # Split by common separators
-    parts = re.split(r'[,|/\n\t]', text)
+    parts = re.split(r'[,|\n\t]', text)
 
     for part in parts:
-        normalized = normalize_keyword(part)
-        if len(normalized) >= min_length:
-            keywords.add(normalized)
+        # Only do minimal cleanup - preserve original text and special chars
+        cleaned = part.strip()
+
+        # Remove leading/trailing punctuation but keep internal special chars
+        cleaned = cleaned.strip('.,;:!?\'"`()[]{}')
+
+        if len(cleaned) >= min_length and cleaned:
+            keywords.add(cleaned)
 
     return keywords
 

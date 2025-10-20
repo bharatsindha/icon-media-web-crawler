@@ -9,7 +9,7 @@ The crawler extracts keywords from website navigation menus and applies intellig
 ## Keyword Processing Pipeline
 
 ```
-Menu HTML → Extract Text → Normalize → Filter → Store in Database
+Menu HTML → Extract Text (Preserve Original) → Filter → Store with Normalization
 ```
 
 ### 1. **Extraction**
@@ -19,14 +19,18 @@ Menu items are extracted from HTML using multiple detection methods:
 - ARIA attributes (`role="navigation"`)
 - Common patterns (classes/IDs containing "menu", "nav", etc.)
 
+**Important:** Original text is preserved during extraction, including special characters like `&`, `/`, `+`, etc. This ensures the `keyword` field stores exactly what appears on the website.
+
 ### 2. **Normalization**
-Keywords are normalized for consistency and deduplication:
+Keywords are normalized **only during database storage** for consistency and deduplication:
 
 **Original Keyword** (stored in `keyword` field):
 - Preserved exactly as found on the website
-- Example: "Products & Services"
+- Special characters and capitalization retained
+- Example: "Products & Services", "Energy/Utilities", "C++ Development"
 
 **Normalized Keyword** (stored in `normalized_keyword` field):
+- Created during database insertion from the original keyword
 - Lowercase conversion
 - Special character replacement:
   - `&` → `and`
@@ -37,7 +41,9 @@ Keywords are normalized for consistency and deduplication:
   - `%` → `percent`
 - Removes remaining special characters
 - Trims whitespace and hyphens
-- Example: "products and services"
+- Example: "products and services", "energy or utilities", "c plus plus development"
+
+**Purpose:** The `normalized_keyword` field is used for deduplication and matching, while the `keyword` field preserves the exact text as it appears on the website.
 
 ### 3. **Filtering**
 Business-focused filtering removes non-business keywords:
