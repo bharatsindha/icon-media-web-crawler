@@ -3,11 +3,21 @@ Database operations for the web crawler.
 """
 
 import logging
-import psycopg2
-from psycopg2 import pool, extras, sql
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
 from contextlib import contextmanager
+
+# Try to import psycopg3 first, fall back to psycopg2
+try:
+    import psycopg
+    from psycopg import sql
+    from psycopg.rows import dict_row
+    from psycopg_pool import ConnectionPool
+    PSYCOPG_VERSION = 3
+except ImportError:
+    import psycopg2 as psycopg
+    from psycopg2 import pool, extras, sql
+    PSYCOPG_VERSION = 2
 
 from config import Config
 
@@ -25,16 +35,30 @@ class DatabaseManager:
     def _initialize_pool(self) -> None:
         """Initialize the PostgreSQL connection pool."""
         try:
-            self.connection_pool = psycopg2.pool.ThreadedConnectionPool(
-                Config.DB_MIN_CONN,
-                Config.DB_MAX_CONN,
-                host=Config.DB_HOST,
-                port=Config.DB_PORT,
-                database=Config.DB_NAME,
-                user=Config.DB_USER,
-                password=Config.DB_PASSWORD
-            )
-            logger.info("Database connection pool initialized successfully")
+            if PSYCOPG_VERSION == 3:
+                # psycopg3 connection pool
+                conninfo = (
+                    f"host={Config.DB_HOST} port={Config.DB_PORT} "
+                    f"dbname={Config.DB_NAME} user={Config.DB_USER} "
+                    f"password={Config.DB_PASSWORD}"
+                )
+                self.connection_pool = ConnectionPool(
+                    conninfo,
+                    min_size=Config.DB_MIN_CONN,
+                    max_size=Config.DB_MAX_CONN
+                )
+            else:
+                # psycopg2 connection pool
+                self.connection_pool = pool.ThreadedConnectionPool(
+                    Config.DB_MIN_CONN,
+                    Config.DB_MAX_CONN,
+                    host=Config.DB_HOST,
+                    port=Config.DB_PORT,
+                    database=Config.DB_NAME,
+                    user=Config.DB_USER,
+                    password=Config.DB_PASSWORD
+                )
+            logger.info(f"Database connection pool initialized successfully (psycopg{PSYCOPG_VERSION})")
         except Exception as e:
             logger.error(f"Failed to initialize database pool: {e}")
             raise
@@ -49,22 +73,32 @@ class DatabaseManager:
         """
         conn = None
         try:
-            conn = self.connection_pool.getconn()
-            yield conn
-            conn.commit()
+            if PSYCOPG_VERSION == 3:
+                # psycopg3 uses connection() context manager
+                with self.connection_pool.connection() as conn:
+                    yield conn
+                    # psycopg3 auto-commits on context exit
+            else:
+                # psycopg2 manual connection management
+                conn = self.connection_pool.getconn()
+                yield conn
+                conn.commit()
         except Exception as e:
-            if conn:
+            if conn and PSYCOPG_VERSION == 2:
                 conn.rollback()
             logger.error(f"Database error: {e}")
             raise
         finally:
-            if conn:
+            if conn and PSYCOPG_VERSION == 2:
                 self.connection_pool.putconn(conn)
 
     def close_pool(self) -> None:
         """Close all connections in the pool."""
         if self.connection_pool:
-            self.connection_pool.closeall()
+            if PSYCOPG_VERSION == 3:
+                self.connection_pool.close()
+            else:
+                self.connection_pool.closeall()
             logger.info("Database connection pool closed")
 
     # Company operations
@@ -77,7 +111,12 @@ class DatabaseManager:
             Dictionary with company info or None
         """
         with self.get_connection() as conn:
-            with conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
+            if PSYCOPG_VERSION == 3:
+                cursor_kwargs = {'row_factory': dict_row}
+            else:
+                cursor_kwargs = {'cursor_factory': extras.RealDictCursor}
+
+            with conn.cursor(**cursor_kwargs) as cur:
                 cur.execute("""
                     SELECT id, domain, last_crawled, crawl_status
                     FROM companies

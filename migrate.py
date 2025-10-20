@@ -19,9 +19,16 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Tuple, Optional
 
-import psycopg2
-from psycopg2 import sql
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+# Try to import psycopg3 first, fall back to psycopg2
+try:
+    import psycopg
+    from psycopg import sql
+    PSYCOPG_VERSION = 3
+except ImportError:
+    import psycopg2 as psycopg
+    from psycopg2 import sql
+    from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+    PSYCOPG_VERSION = 2
 
 from config import Config
 
@@ -52,14 +59,22 @@ class MigrationManager:
     def connect(self) -> None:
         """Connect to PostgreSQL database."""
         try:
-            self.conn = psycopg2.connect(
-                host=Config.DB_HOST,
-                port=Config.DB_PORT,
-                database=Config.DB_NAME,
-                user=Config.DB_USER,
-                password=Config.DB_PASSWORD
-            )
-            logger.info("Database connection established")
+            if PSYCOPG_VERSION == 3:
+                conninfo = (
+                    f"host={Config.DB_HOST} port={Config.DB_PORT} "
+                    f"dbname={Config.DB_NAME} user={Config.DB_USER} "
+                    f"password={Config.DB_PASSWORD}"
+                )
+                self.conn = psycopg.connect(conninfo, autocommit=True)
+            else:
+                self.conn = psycopg.connect(
+                    host=Config.DB_HOST,
+                    port=Config.DB_PORT,
+                    database=Config.DB_NAME,
+                    user=Config.DB_USER,
+                    password=Config.DB_PASSWORD
+                )
+            logger.info(f"Database connection established (psycopg{PSYCOPG_VERSION})")
         except Exception as e:
             logger.error(f"Failed to connect to database: {e}")
             sys.exit(1)

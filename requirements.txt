@@ -8,8 +8,13 @@ urllib3==2.1.0
 beautifulsoup4==4.12.3
 lxml==5.1.0
 
-# Database
-psycopg2-binary==2.9.9
+# Database (choose one based on your Python version)
+# For Python 3.12+ (recommended for newer Python versions)
+psycopg[binary]==3.2.3
+psycopg-pool==3.2.5
+
+# For Python < 3.12 (uncomment if psycopg3 fails)
+# psycopg2-binary==2.9.9
 
 # Environment configuration
 python-dotenv==1.0.1
