@@ -6,17 +6,42 @@ import re
 import time
 import random
 import logging
-from typing import Optional, Set
+import yaml
+from pathlib import Path
+from typing import Optional, Set, List, Dict
 from urllib.parse import urlparse, urljoin
 from urllib.robotparser import RobotFileParser
+from fnmatch import fnmatch
 
 logger = logging.getLogger(__name__)
 
 
+# Special character replacements for normalization
+SPECIAL_CHAR_REPLACEMENTS = {
+    '&': ' and ',
+    '/': ' or ',
+    '+': ' plus ',
+    '@': ' at ',
+    '#': ' number ',
+    '%': ' percent ',
+}
+
+
 def normalize_keyword(keyword: str) -> str:
     """
-    Normalize a keyword by converting to lowercase, removing special characters,
-    and trimming whitespace.
+    Normalize a keyword by converting to lowercase, replacing special characters
+    with text equivalents, and trimming whitespace.
+
+    The original keyword is preserved separately. This normalized version is used
+    for deduplication and search.
+
+    Special character replacements:
+    - & → and
+    - / → or
+    - + → plus
+    - @ → at
+    - # → number
+    - % → percent
 
     Args:
         keyword: The keyword to normalize
@@ -30,14 +55,21 @@ def normalize_keyword(keyword: str) -> str:
     # Convert to lowercase
     normalized = keyword.lower()
 
-    # Remove special characters but keep spaces, hyphens, and underscores
+    # Replace special characters with text equivalents
+    for char, replacement in SPECIAL_CHAR_REPLACEMENTS.items():
+        normalized = normalized.replace(char, replacement)
+
+    # Remove remaining special characters but keep spaces, hyphens, and underscores
     normalized = re.sub(r'[^\w\s\-]', '', normalized)
 
     # Replace multiple spaces with single space
     normalized = re.sub(r'\s+', ' ', normalized)
 
-    # Trim whitespace
-    normalized = normalized.strip()
+    # Replace multiple hyphens with single hyphen
+    normalized = re.sub(r'-+', '-', normalized)
+
+    # Trim whitespace and hyphens
+    normalized = normalized.strip().strip('-')
 
     return normalized
 
@@ -300,3 +332,155 @@ class ProgressTracker:
             f"Success: {self.successful}, Failed: {self.failed} - "
             f"Rate: {stats['rate_per_second']:.2f}/s"
         )
+
+
+class KeywordFilter:
+    """Filter keywords based on exclusion rules."""
+
+    def __init__(self, config_file: str = 'keyword_exclusions.yaml'):
+        """
+        Initialize keyword filter.
+
+        Args:
+            config_file: Path to YAML configuration file
+        """
+        self.config_file = config_file
+        self.enabled = True
+        self.case_insensitive = True
+        self.log_excluded = True
+        self.min_length = 2
+        self.max_length = 50
+        self.exclusions = set()
+        self.patterns = []
+        self.excluded_count = 0
+
+        self._load_config()
+
+    def _load_config(self) -> None:
+        """Load exclusion configuration from YAML file."""
+        config_path = Path(self.config_file)
+
+        if not config_path.exists():
+            logger.warning(f"Keyword exclusion config not found: {self.config_file}")
+            logger.info("Keyword filtering disabled")
+            self.enabled = False
+            return
+
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+
+            # Load configuration options
+            if 'config' in config:
+                cfg = config['config']
+                self.enabled = cfg.get('enabled', True)
+                self.case_insensitive = cfg.get('case_insensitive', True)
+                self.log_excluded = cfg.get('log_excluded', True)
+                self.min_length = cfg.get('min_length', 2)
+                self.max_length = cfg.get('max_length', 50)
+
+            if not self.enabled:
+                logger.info("Keyword filtering disabled by configuration")
+                return
+
+            # Load exclusion categories
+            for category in ['navigation', 'legal', 'support', 'social',
+                           'authentication', 'locale', 'actions', 'footer', 'utility']:
+                if category in config and config[category]:
+                    for term in config[category]:
+                        if self.case_insensitive:
+                            term = term.lower()
+                        self.exclusions.add(term)
+
+            # Load patterns
+            if 'patterns' in config and config['patterns']:
+                self.patterns = config['patterns']
+                if self.case_insensitive:
+                    self.patterns = [p.lower() for p in self.patterns]
+
+            logger.info(
+                f"Loaded {len(self.exclusions)} exclusion terms and "
+                f"{len(self.patterns)} patterns from {self.config_file}"
+            )
+
+        except Exception as e:
+            logger.error(f"Error loading keyword exclusion config: {e}")
+            self.enabled = False
+
+    def should_exclude(self, keyword: str) -> bool:
+        """
+        Check if a keyword should be excluded.
+
+        Args:
+            keyword: Keyword to check
+
+        Returns:
+            True if keyword should be excluded, False otherwise
+        """
+        if not self.enabled:
+            return False
+
+        if not keyword:
+            return True
+
+        # Check length
+        if len(keyword) < self.min_length or len(keyword) > self.max_length:
+            return True
+
+        # Prepare keyword for comparison
+        check_keyword = keyword.lower() if self.case_insensitive else keyword
+
+        # Check exact matches
+        if check_keyword in self.exclusions:
+            if self.log_excluded:
+                logger.debug(f"Excluded (exact match): '{keyword}'")
+                self.excluded_count += 1
+            return True
+
+        # Check patterns
+        for pattern in self.patterns:
+            if fnmatch(check_keyword, pattern):
+                if self.log_excluded:
+                    logger.debug(f"Excluded (pattern '{pattern}'): '{keyword}'")
+                    self.excluded_count += 1
+                return True
+
+        return False
+
+    def filter_keywords(self, keywords: Set[str]) -> Set[str]:
+        """
+        Filter a set of keywords, removing excluded ones.
+
+        Args:
+            keywords: Set of keywords to filter
+
+        Returns:
+            Filtered set of keywords
+        """
+        if not self.enabled:
+            return keywords
+
+        filtered = {kw for kw in keywords if not self.should_exclude(kw)}
+
+        excluded_count = len(keywords) - len(filtered)
+        if excluded_count > 0:
+            logger.info(
+                f"Filtered {excluded_count} non-business keywords "
+                f"({len(filtered)} remaining)"
+            )
+
+        return filtered
+
+    def get_stats(self) -> Dict:
+        """
+        Get filtering statistics.
+
+        Returns:
+            Dictionary with statistics
+        """
+        return {
+            'enabled': self.enabled,
+            'total_exclusions': len(self.exclusions),
+            'total_patterns': len(self.patterns),
+            'excluded_count': self.excluded_count
+        }

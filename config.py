@@ -49,6 +49,10 @@ class Config:
     BATCH_SIZE = int(os.getenv('BATCH_SIZE', 100))
     PROCESS_SEQUENTIAL = os.getenv('PROCESS_SEQUENTIAL', 'true').lower() == 'true'
 
+    # Keyword filtering settings
+    ENABLE_KEYWORD_FILTER = os.getenv('ENABLE_KEYWORD_FILTER', 'true').lower() == 'true'
+    KEYWORD_EXCLUSIONS_FILE = os.getenv('KEYWORD_EXCLUSIONS_FILE', 'keyword_exclusions.yaml')
+
     @classmethod
     def get_db_connection_string(cls):
         """Get PostgreSQL connection string."""

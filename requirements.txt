@@ -19,5 +19,8 @@ psycopg-pool==3.2.5
 # Environment configuration
 python-dotenv==1.0.1
 
+# YAML configuration
+PyYAML==6.0.1
+
 # Optional: Better performance
 # httpx==0.27.0  # Alternative to requests with HTTP/2 support

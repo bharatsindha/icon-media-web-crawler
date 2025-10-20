@@ -5,7 +5,8 @@ HTML parser for extracting navigation menu items from websites.
 import logging
 from typing import List, Set
 from bs4 import BeautifulSoup, Tag
-from utils import extract_keywords_from_text, sanitize_text
+from utils import extract_keywords_from_text, sanitize_text, KeywordFilter
+from config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,13 @@ class MenuParser:
     def __init__(self):
         """Initialize the menu parser."""
         self.soup = None
+        # Initialize keyword filter based on configuration
+        if Config.ENABLE_KEYWORD_FILTER:
+            self.keyword_filter = KeywordFilter(Config.KEYWORD_EXCLUSIONS_FILE)
+            logger.info("Keyword filtering enabled")
+        else:
+            self.keyword_filter = None
+            logger.info("Keyword filtering disabled")
 
     def parse(self, html_content: str) -> List[str]:
         """
@@ -305,13 +313,16 @@ class MenuParser:
 
     def extract_keywords(self, html_content: str) -> Set[str]:
         """
-        Extract and normalize keywords from menu items.
+        Extract, normalize, and filter keywords from menu items.
+
+        Applies keyword filtering to exclude non-business terms like navigation,
+        legal, social media, and authentication items.
 
         Args:
             html_content: Raw HTML content
 
         Returns:
-            Set of normalized keywords
+            Set of filtered, normalized keywords (business-focused)
         """
         menu_items = self.parse(html_content)
 
@@ -321,8 +332,19 @@ class MenuParser:
             keywords = extract_keywords_from_text(item)
             all_keywords.update(keywords)
 
-        logger.debug(f"Extracted {len(all_keywords)} unique keywords from menu items")
-        return all_keywords
+        logger.debug(f"Extracted {len(all_keywords)} raw keywords from menu items")
+
+        # Apply keyword filtering to exclude non-business terms (if enabled)
+        if self.keyword_filter:
+            filtered_keywords = self.keyword_filter.filter_keywords(all_keywords)
+            logger.debug(
+                f"After filtering: {len(filtered_keywords)} business keywords "
+                f"({len(all_keywords) - len(filtered_keywords)} excluded)"
+            )
+            return filtered_keywords
+        else:
+            logger.debug("Keyword filtering disabled, returning all keywords")
+            return all_keywords
 
     def get_menu_structure(self, html_content: str) -> dict:
         """

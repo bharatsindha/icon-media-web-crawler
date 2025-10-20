@@ -1,0 +1,179 @@
+# Keyword Exclusion Configuration
+# Keywords in these categories will be excluded from the database
+# as they don't represent business offerings or services
+
+# Generic navigation items
+navigation:
+  - home
+  - homepage
+  - about
+  - about us
+  - about company
+  - who we are
+  - contact
+  - contact us
+  - get in touch
+  - careers
+  - jobs
+  - work with us
+  - blog
+  - news
+  - press
+  - media
+  - events
+  - calendar
+  - sitemap
+  - menu
+
+# Legal and compliance terms
+legal:
+  - privacy
+  - privacy policy
+  - privacy notice
+  - terms
+  - terms of service
+  - terms and conditions
+  - disclaimer
+  - legal
+  - legal notice
+  - cookies
+  - cookie policy
+  - gdpr
+  - compliance
+  - accessibility
+
+# Support and help items
+support:
+  - help
+  - help center
+  - support
+  - customer support
+  - faq
+  - faqs
+  - documentation
+  - docs
+  - resources
+  - knowledge base
+  - tutorials
+  - guides
+  - getting started
+
+# Social media and community
+social:
+  - facebook
+  - twitter
+  - linkedin
+  - youtube
+  - instagram
+  - pinterest
+  - social media
+  - follow us
+  - connect with us
+  - community
+  - forum
+  - forums
+
+# Authentication and account management
+authentication:
+  - login
+  - log in
+  - sign in
+  - signin
+  - register
+  - sign up
+  - signup
+  - logout
+  - log out
+  - sign out
+  - my account
+  - account
+  - profile
+  - dashboard
+
+# Language and region selectors
+locale:
+  - english
+  - spanish
+  - french
+  - german
+  - chinese
+  - japanese
+  - korean
+  - language
+  - select language
+  - united states
+  - canada
+  - uk
+  - europe
+  - asia
+  - region
+  - country
+
+# Generic actions and CTAs
+actions:
+  - search
+  - find
+  - download
+  - downloads
+  - subscribe
+  - newsletter
+  - follow
+  - share
+  - print
+  - email
+  - go
+  - view all
+  - see all
+  - more
+  - less
+  - back
+  - next
+  - previous
+
+# Footer utility items
+footer:
+  - copyright
+  - all rights reserved
+  - powered by
+  - designed by
+  - developed by
+
+# Common utility items
+utility:
+  - skip to content
+  - skip navigation
+  - close
+  - open
+  - toggle
+  - expand
+  - collapse
+  - show
+  - hide
+
+# Patterns to exclude (supports wildcards)
+# Use * for any characters, ? for single character
+patterns:
+  - "copyright*"
+  - "*rights reserved*"
+  - "powered by*"
+  - "designed by*"
+  - "all rights*"
+  - "skip to*"
+  - "skip navigation*"
+
+# Configuration options
+config:
+  # Enable exclusion filtering
+  enabled: true
+
+  # Case-insensitive matching
+  case_insensitive: true
+
+  # Log excluded keywords for review
+  log_excluded: true
+
+  # Minimum keyword length (characters)
+  min_length: 2
+
+  # Maximum keyword length (characters)
+  max_length: 50

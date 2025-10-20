@@ -10,6 +10,12 @@ A production-ready Python web crawler that extracts navigation menu items from w
   - HTML5 semantic tags (`<nav>`, `<menu>`)
   - ARIA attributes (role="navigation")
   - Common naming patterns
+- **Smart Keyword Processing**:
+  - Preserves original keywords with special characters (& / + @ # %)
+  - Intelligent normalization (& → and, / → or, etc.)
+  - Business-focused filtering (excludes navigation, legal, social media)
+  - Configurable exclusion rules via YAML
+  - See [KEYWORDS.md](KEYWORDS.md) for details
 - **Robust Error Handling**: Handles network timeouts, SSL errors, invalid URLs, and robots.txt
 - **Smart Deduplication**: Normalizes and deduplicates keywords across domains
 - **Production-Ready**:
@@ -328,13 +334,42 @@ The parser uses multiple methods to find navigation menus:
 ### Common Patterns
 - Elements with classes/IDs containing: menu, nav, navigation, navbar, menubar
 
-## Keyword Normalization
+## Keyword Processing
 
-Keywords are normalized using:
+### Normalization
+
+Two versions of each keyword are stored:
+
+**Original Keyword** (`keyword` field):
+- Preserved exactly as found: `"Products & Services"`
+- Special characters kept intact
+
+**Normalized Keyword** (`normalized_keyword` field):
 - Lowercase conversion
-- Special character removal (keeping spaces, hyphens, underscores)
-- Whitespace trimming and consolidation
-- Deduplication by normalized form
+- Special character replacements:
+  - `&` → `and`
+  - `/` → `or`
+  - `+` → `plus`
+  - `@` → `at`
+  - `#` → `number`
+  - `%` → `percent`
+- Whitespace consolidation and trimming
+- Example: `"products and services"`
+- Used for deduplication
+
+### Business-Focused Filtering
+
+Automatically excludes non-business keywords:
+- ✗ Navigation (home, about, contact)
+- ✗ Legal (privacy, terms, cookies)
+- ✗ Social Media (facebook, twitter, linkedin)
+- ✗ Authentication (login, register, sign up)
+- ✗ Utility (search, download, help)
+- ✓ Services, products, solutions
+- ✓ Industry-specific terms
+- ✓ Business capabilities
+
+Configurable via `keyword_exclusions.yaml`. See [KEYWORDS.md](KEYWORDS.md) for details.
 
 ## Error Handling
 
