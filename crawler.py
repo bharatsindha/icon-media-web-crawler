@@ -333,6 +333,113 @@ class WebCrawler:
             f"Total Keywords: {final_stats['total_keywords']}"
         )
 
+    def crawl_single_domain(self, domain: str) -> bool:
+        """
+        Crawl a specific domain on-demand, bypassing status checks.
+
+        Args:
+            domain: Domain to crawl
+
+        Returns:
+            True if successful, False otherwise
+        """
+        from utils import normalize_domain
+
+        logger.info(f"On-demand crawl requested for: {domain}")
+
+        # Normalize the domain
+        normalized_domain = normalize_domain(domain)
+        logger.info(f"Normalized domain: {normalized_domain}")
+
+        # Check if domain exists in database
+        company = self.db.get_company_by_domain(normalized_domain)
+
+        if not company:
+            logger.error(f"Domain not found in database: {normalized_domain}")
+            logger.error("Please add the domain first using add_domains.py or import_companies.py")
+            return False
+
+        company_id = company['id']
+        current_status = company['crawl_status']
+
+        logger.info(f"Found company ID: {company_id}")
+        logger.info(f"Current status: {current_status}")
+        logger.info(f"Last crawled: {company.get('last_crawled', 'Never')}")
+
+        # Force crawl regardless of current status
+        logger.info("Forcing crawl (bypassing status check)")
+
+        try:
+            # Update status to in_progress
+            self.db.update_company_status(company_id, 'in_progress')
+
+            # Create crawl job
+            job_id = self.db.create_crawl_job(company_id)
+            logger.info(f"Created crawl job: {job_id}")
+
+            # Crawl the domain
+            result = self.crawl_domain(normalized_domain, company_id)
+
+            # Update job and company status
+            if result['success']:
+                self.db.update_crawl_job(
+                    job_id,
+                    'completed',
+                    pages_crawled=result['pages_crawled'],
+                    pages_failed=result['pages_failed'],
+                    new_keywords_found=result['new_keywords']
+                )
+                self.db.update_company_status(company_id, 'completed')
+
+                # Print summary
+                print("\n" + "=" * 70)
+                print("CRAWL RESULTS")
+                print("=" * 70)
+                print(f"Domain:          {normalized_domain}")
+                print(f"Status:          SUCCESS")
+                print(f"Keywords found:  {result['keywords_found']}")
+                print(f"New keywords:    {result['new_keywords']}")
+                print(f"Pages crawled:   {result['pages_crawled']}")
+                print(f"Pages failed:    {result['pages_failed']}")
+                print(f"Job ID:          {job_id}")
+                print("=" * 70 + "\n")
+
+                return True
+            else:
+                self.db.update_crawl_job(
+                    job_id,
+                    'failed',
+                    pages_crawled=result['pages_crawled'],
+                    pages_failed=result['pages_failed'],
+                    error_message=result['error']
+                )
+                self.db.update_company_status(
+                    company_id,
+                    'failed',
+                    error_message=result['error']
+                )
+
+                # Print error summary
+                print("\n" + "=" * 70)
+                print("CRAWL RESULTS")
+                print("=" * 70)
+                print(f"Domain:          {normalized_domain}")
+                print(f"Status:          FAILED")
+                print(f"Error:           {result['error']}")
+                print(f"Job ID:          {job_id}")
+                print("=" * 70 + "\n")
+
+                return False
+
+        except Exception as e:
+            logger.error(f"Error during on-demand crawl: {e}", exc_info=True)
+            self.db.update_company_status(
+                company_id,
+                'failed',
+                error_message=str(e)
+            )
+            return False
+
     def stop(self) -> None:
         """Signal the crawler to stop gracefully."""
         logger.info("Stopping crawler...")

@@ -127,6 +127,30 @@ class DatabaseManager:
                 """)
                 return cur.fetchone()
 
+    def get_company_by_domain(self, domain: str) -> Optional[Dict]:
+        """
+        Get company information by domain name.
+
+        Args:
+            domain: Domain name to look up
+
+        Returns:
+            Dictionary with company info or None if not found
+        """
+        with self.get_connection() as conn:
+            if PSYCOPG_VERSION == 3:
+                cursor_kwargs = {'row_factory': dict_row}
+            else:
+                cursor_kwargs = {'cursor_factory': extras.RealDictCursor}
+
+            with conn.cursor(**cursor_kwargs) as cur:
+                cur.execute("""
+                    SELECT id, domain, last_crawled, crawl_status, is_active
+                    FROM companies
+                    WHERE domain = %s
+                """, (domain,))
+                return cur.fetchone()
+
     def update_company_status(
         self,
         company_id: int,

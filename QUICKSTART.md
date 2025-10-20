@@ -84,6 +84,8 @@ python import_companies.py -f your_domains.csv
 
 ## Step 5: Run the Crawler
 
+### Batch Mode (All Pending Domains)
+
 ```bash
 python main.py
 ```
@@ -93,6 +95,20 @@ The crawler will:
 2. Extract navigation menu items
 3. Store keywords in the database
 4. Log progress to console and files
+
+### On-Demand Mode (Single Domain)
+
+Test with a specific domain:
+
+```bash
+# Crawl just one domain
+python main.py --domain example.com
+
+# With detailed debugging
+python main.py -d example.com --verbose
+```
+
+**Tip**: Use on-demand mode to test newly added domains before running a full batch.
 
 ## Step 6: Monitor Progress
 

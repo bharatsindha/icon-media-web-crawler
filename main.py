@@ -6,6 +6,7 @@ import os
 import sys
 import signal
 import logging
+import argparse
 from datetime import datetime
 from pathlib import Path
 
@@ -70,12 +71,54 @@ def signal_handler(signum, frame):
         signal_handler.crawler.stop()
 
 
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description='Web crawler for extracting navigation menu keywords',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Batch mode - crawl all pending domains
+  python main.py
+
+  # On-demand mode - crawl specific domain
+  python main.py --domain example.com
+  python main.py -d example.com
+
+  # On-demand with verbose logging
+  python main.py --domain example.com --verbose
+        """
+    )
+
+    parser.add_argument(
+        '-d', '--domain',
+        help='Crawl a specific domain on-demand (bypasses status checks)'
+    )
+
+    parser.add_argument(
+        '-v', '--verbose',
+        action='store_true',
+        help='Enable verbose (DEBUG) logging'
+    )
+
+    return parser.parse_args()
+
+
 def main():
     """Main application entry point."""
+    # Parse command line arguments
+    args = parse_arguments()
+
     # Setup logging
+    if args.verbose:
+        Config.LOG_LEVEL = 'DEBUG'
+
     logger = setup_logging()
     logger.info("=" * 80)
-    logger.info("Web Crawler Application Starting")
+    if args.domain:
+        logger.info(f"Web Crawler - On-Demand Mode (Domain: {args.domain})")
+    else:
+        logger.info("Web Crawler - Batch Mode")
     logger.info("=" * 80)
 
     # Validate configuration
@@ -120,12 +163,22 @@ def main():
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
-        logger.info("Starting crawl process...")
+        # Run crawler in appropriate mode
+        if args.domain:
+            # On-demand mode: crawl specific domain
+            logger.info(f"Starting on-demand crawl for: {args.domain}")
+            success = crawler.crawl_single_domain(args.domain)
 
-        # Run crawler
-        crawler.run()
-
-        logger.info("Crawl process completed successfully")
+            if success:
+                logger.info(f"Successfully crawled {args.domain}")
+            else:
+                logger.error(f"Failed to crawl {args.domain}")
+                sys.exit(1)
+        else:
+            # Batch mode: crawl all pending domains
+            logger.info("Starting batch crawl process...")
+            crawler.run()
+            logger.info("Batch crawl process completed successfully")
 
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")

@@ -247,7 +247,9 @@ See [examples/](examples/) directory for sample CSV files.
 
 ### Basic Usage
 
-Run the crawler:
+#### Batch Mode (Default)
+
+Crawl all pending domains sequentially:
 ```bash
 python main.py
 ```
@@ -259,6 +261,52 @@ The crawler will:
 4. Store normalized keywords in the database
 5. Update crawl status and statistics
 6. Log all activity
+
+#### On-Demand Mode
+
+Crawl a specific domain immediately, bypassing status checks:
+
+```bash
+# Crawl a specific domain
+python main.py --domain example.com
+python main.py -d example.com
+
+# With verbose logging
+python main.py --domain example.com --verbose
+python main.py -d example.com -v
+```
+
+**Features:**
+- Bypasses crawl_status checks (works even if status is 'completed')
+- Forces immediate crawl
+- Shows detailed results summary
+- Updates last_crawled timestamp
+- Creates new crawl_job entry
+
+**Use Cases:**
+- Testing newly added domains
+- Re-crawling specific sites after updates
+- On-demand keyword refresh
+- Debugging crawl issues
+
+**Requirements:**
+- Domain must exist in companies table
+- Add domains first using `add_domains.py` or `import_companies.py`
+
+**Example Output:**
+```
+======================================================================
+CRAWL RESULTS
+======================================================================
+Domain:          example.com
+Status:          SUCCESS
+Keywords found:  25
+New keywords:    12
+Pages crawled:   1
+Pages failed:    0
+Job ID:          a1b2c3d4-e5f6-7890-abcd-ef1234567890
+======================================================================
+```
 
 ### Graceful Shutdown
 
