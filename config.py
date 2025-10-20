@@ -28,10 +28,10 @@ class Config:
     MAX_RETRIES = int(os.getenv('MAX_RETRIES', 3))
     RETRY_DELAY = int(os.getenv('RETRY_DELAY', 5))
 
-    # User agent
+    # User agent (default to Chrome on macOS to avoid bot detection)
     USER_AGENT = os.getenv(
         'USER_AGENT',
-        'Mozilla/5.0 (compatible; MenuCrawler/1.0; +http://example.com/bot)'
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
     )
 
     # Logging settings
