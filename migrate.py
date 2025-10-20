@@ -116,13 +116,16 @@ class MigrationManager:
     def get_migration_files(self) -> List[str]:
         """
         Get all migration files in order.
+        Excludes rollback files (*_down.sql).
 
         Returns:
             List of migration filenames
         """
         migrations = []
         for file in sorted(self.migrations_dir.glob('*.sql')):
-            migrations.append(file.name)
+            # Exclude rollback files
+            if not file.name.endswith('_down.sql'):
+                migrations.append(file.name)
         return migrations
 
     def get_applied_migrations(self) -> List[str]:
