@@ -505,22 +505,31 @@ Monitor the crawler:
 
 ## Troubleshooting
 
-### No domains being crawled
-- Check that companies have `crawl_status = 'pending'` and `is_active = true`
-- Verify database connection settings in `.env`
+For detailed troubleshooting information, see **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**.
 
-### SSL errors
-- Set `VERIFY_SSL=false` in `.env` (not recommended for production)
-- Update certificates or use HTTP for testing
+### Common Issues
 
-### Rate limiting issues
-- Adjust `RATE_LIMIT_MIN` and `RATE_LIMIT_MAX` in `.env`
-- Some sites may block requests; check User-Agent string
+**403 Forbidden Errors:**
+- Some sites (~5-10%) block automated crawlers
+- Enhanced headers help with most sites (94%+ success rate)
+- See TROUBLESHOOTING.md for solutions
 
-### Database connection errors
-- Verify PostgreSQL is running
-- Check credentials in `.env`
-- Ensure database schema is created
+**No Keywords Found:**
+- Site may use JavaScript to render navigation
+- Check site manually to verify menu structure
+
+**Failed Domains:**
+```bash
+# View domains that failed to crawl
+python check_status.py failed
+```
+
+**Reset Stuck Jobs:**
+```bash
+python check_status.py reset
+```
+
+For complete troubleshooting guide including SSL errors, timeouts, database issues, and performance tuning, see **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**.
 
 ## License
 
