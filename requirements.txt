@@ -8,6 +8,9 @@ urllib3==2.1.0
 beautifulsoup4==4.12.3
 lxml==5.1.0
 
+# Compression support for Brotli-encoded responses
+brotli==1.1.0
+
 # Database (choose one based on your Python version)
 # For Python 3.12+ (recommended for newer Python versions)
 psycopg[binary]==3.2.3

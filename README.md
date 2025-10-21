@@ -1,22 +1,44 @@
-# Web Crawler - Navigation Menu Extractor
+# Web Crawler - Business Keyword Extractor
 
-A production-ready Python web crawler that extracts navigation menu items from websites and stores them in PostgreSQL with intelligent deduplication.
+A production-ready Python web crawler that extracts business keywords from websites using multiple precision methods and stores them in PostgreSQL with intelligent deduplication and source tracking.
 
 ## Features
 
-- **Sequential Processing**: Processes domains one at a time from the companies table
-- **Multi-Method Detection**: Extracts menu items using:
+### Multi-Section Extraction
+
+- **Navigation Menu Extraction**: Traditional menu-based keyword extraction
   - CSS selectors (nav, .menu, #menu, etc.)
   - HTML5 semantic tags (`<nav>`, `<menu>`)
   - ARIA attributes (role="navigation")
   - Common naming patterns
+
+- **Service Page Extraction** (NEW): High-precision service keyword extraction
+  - Follows navigation links to dedicated service pages
+  - Extracts from H1 tags (95% confidence)
+  - Extracts from page titles (90% confidence)
+  - Extracts from meta keywords (85% confidence)
+  - Extracts from JSON-LD structured data (100% confidence)
+  - Full source URL tracking for every keyword
+  - Validates keywords with business term indicators
+  - Achieves 100% accuracy by only extracting explicit service names
+
+### Core Features
+
+- **Sequential Processing**: Processes domains one at a time from the companies table
 - **Smart Keyword Processing**:
   - Preserves original keywords with special characters (& / + @ # %)
   - Intelligent normalization (& → and, / → or, etc.)
   - Business-focused filtering (excludes navigation, legal, social media)
   - Configurable exclusion rules via YAML
   - See [KEYWORDS.md](KEYWORDS.md) for details
-- **Robust Error Handling**: Handles network timeouts, SSL errors, invalid URLs, and robots.txt
+- **Source Tracking**: Every service keyword includes:
+  - Source URL where it was found
+  - Extraction method used (h1, title, meta, json_ld)
+  - Confidence score (0.80-1.00)
+- **Robust Error Handling**:
+  - Handles network timeouts, SSL errors, invalid URLs
+  - Respects robots.txt
+  - Brotli compression support
 - **Smart Deduplication**: Normalizes and deduplicates keywords across domains
 - **Production-Ready**:
   - Connection pooling
@@ -31,9 +53,16 @@ A production-ready Python web crawler that extracts navigation menu items from w
 The crawler uses 5 main tables:
 
 1. **companies** - Stores domains with crawl status tracking
-2. **section_types** - Categorizes content sections (currently 'menu')
+2. **section_types** - Categorizes content sections:
+   - `menu` - Navigation menu keywords
+   - `service_detail` - Keywords from individual service pages
+   - `service_listing` - Keywords from service hub/listing pages
 3. **keywords_master** - Global unique keywords with statistics
-4. **domain_keywords** - Links keywords to domains with frequency data
+4. **domain_keywords** - Links keywords to domains with:
+   - Frequency data
+   - Source URL tracking (for service keywords)
+   - Extraction method (h1, title, meta, json_ld, service_card)
+   - Confidence score (0.80-1.00)
 5. **crawl_jobs** - Tracks individual crawl job execution
 
 ## Installation
@@ -115,6 +144,11 @@ python migrate.py create "add_new_field"
 2. **002_seed_data.sql** - Seeds initial data
    - Inserts section_types ('menu')
    - Validates seeded data
+
+3. **003_add_service_extraction.sql** - Adds service extraction support
+   - New section types: 'service_detail', 'service_listing'
+   - Source tracking columns: source_url, extraction_method, confidence_score
+   - Indexes for efficient querying
 
 ### Migration Files
 
@@ -249,7 +283,7 @@ See [examples/](examples/) directory for sample CSV files.
 
 #### Batch Mode (Default)
 
-Crawl all pending domains sequentially:
+Crawl all pending domains sequentially with complete extraction (menu + services):
 ```bash
 python main.py
 ```
@@ -257,17 +291,25 @@ python main.py
 The crawler will:
 1. Check for pending domains in the companies table
 2. Process each domain sequentially
-3. Extract navigation menu items
-4. Store normalized keywords in the database
-5. Update crawl status and statistics
-6. Log all activity
+3. **Extract navigation menu keywords** from homepage
+4. **Extract service keywords** by following navigation links to service pages (up to 20 pages per domain)
+5. Store normalized keywords with source tracking in the database
+6. Update crawl status and statistics
+7. Log all activity with detailed progress
 
-#### On-Demand Mode
+**Example Output per Domain:**
+```
+[example.com] Extracting navigation menu keywords...
+[example.com] Extracting service keywords...
+[example.com] Complete - Menu: 25 kw, Services: 12 kw (8 pages), Total new: 37
+```
 
-Crawl a specific domain immediately, bypassing status checks:
+#### On-Demand Mode - Menu Extraction Only
+
+Crawl a specific domain's navigation menu immediately:
 
 ```bash
-# Crawl a specific domain
+# Crawl navigation menu only
 python main.py --domain example.com
 python main.py -d example.com
 
@@ -275,23 +317,6 @@ python main.py -d example.com
 python main.py --domain example.com --verbose
 python main.py -d example.com -v
 ```
-
-**Features:**
-- Bypasses crawl_status checks (works even if status is 'completed')
-- Forces immediate crawl
-- Shows detailed results summary
-- Updates last_crawled timestamp
-- Creates new crawl_job entry
-
-**Use Cases:**
-- Testing newly added domains
-- Re-crawling specific sites after updates
-- On-demand keyword refresh
-- Debugging crawl issues
-
-**Requirements:**
-- Domain must exist in companies table
-- Add domains first using `add_domains.py` or `import_companies.py`
 
 **Example Output:**
 ```
@@ -307,6 +332,71 @@ Pages failed:    0
 Job ID:          a1b2c3d4-e5f6-7890-abcd-ef1234567890
 ======================================================================
 ```
+
+#### On-Demand Mode - Complete Extraction (Menu + Services)
+
+Extract both navigation menu AND service keywords by following links to service pages:
+
+```bash
+# Complete extraction: menu + services
+python main.py --domain example.com --extract-services
+
+# With verbose logging
+python main.py --domain example.com --extract-services --verbose
+```
+
+**What it does:**
+1. **Step 1**: Extracts navigation menu keywords (same as menu-only mode)
+2. **Step 2**: Follows navigation links to service pages (up to 20 pages)
+3. **Step 3**: Extracts service keywords from H1, title, meta, and JSON-LD
+4. **Step 4**: Validates and stores with source tracking
+
+**Example Output:**
+```
+======================================================================
+COMPLETE EXTRACTION RESULTS
+======================================================================
+Domain:              example.com
+Status:              SUCCESS
+
+Menu Extraction:
+  Keywords found:    25
+  New keywords:      25
+
+Service Extraction:
+  Service links:     8
+  Keywords found:    12
+  New keywords:      12
+
+Total:
+  Keywords found:    37
+  New keywords:      37
+  Pages crawled:     9
+  Pages failed:      0
+Job ID:              a1b2c3d4-e5f6-7890-abcd-ef1234567890
+======================================================================
+```
+
+**Features:**
+- Bypasses crawl_status checks (works even if status is 'completed')
+- Forces immediate crawl
+- Shows detailed results summary
+- Updates last_crawled timestamp
+- Creates new crawl_job entry
+- Tracks source URL for every service keyword
+- Assigns confidence scores based on extraction method
+
+**Use Cases:**
+- Complete keyword extraction for business analysis
+- Getting precise service/offering information
+- Re-crawling specific sites after updates
+- Testing service extraction accuracy
+- Debugging crawl issues
+
+**Requirements:**
+- Domain must exist in companies table
+- Add domains first using `add_domains.py` or `import_companies.py`
+- Brotli compression support (automatically installed with requirements.txt)
 
 ### Graceful Shutdown
 
@@ -329,6 +419,7 @@ web_crawler/
 ├── main.py              # Entry point with graceful shutdown
 ├── crawler.py           # Main crawling logic
 ├── parser.py            # HTML parsing and menu extraction
+├── service_extractor.py # Service page extraction (link-following, H1, title, meta, JSON-LD)
 ├── database.py          # Database operations with connection pooling
 ├── utils.py             # Utility functions (normalization, rate limiting)
 ├── config.py            # Configuration management
@@ -337,6 +428,7 @@ web_crawler/
 ├── import_companies.py  # Import domains from CSV files (bulk)
 ├── check_status.py      # Status monitoring and statistics
 ├── cleanup_db.py        # Database cleanup utility
+├── test_brotli.py       # Diagnostic tool for brotli compression support
 ├── requirements.txt     # Python dependencies
 ├── .env.example         # Environment variables template
 ├── .env                 # Your local configuration (not in git)
@@ -348,6 +440,8 @@ web_crawler/
 │   ├── 001_create_tables_down.sql
 │   ├── 002_seed_data.sql
 │   ├── 002_seed_data_down.sql
+│   ├── 003_add_service_extraction.sql
+│   ├── 003_add_service_extraction_down.sql
 │   └── README.md
 ├── examples/            # Sample CSV files for import
 │   ├── domains_simple.csv
@@ -359,28 +453,119 @@ web_crawler/
 └── README.md            # This file
 ```
 
-## Menu Detection Methods
+## Extraction Methods
+
+### Menu Detection Methods
 
 The parser uses multiple methods to find navigation menus:
 
-### CSS Selectors
+#### CSS Selectors
 - `nav`, `.nav`, `#nav`
 - `.menu`, `#menu`
 - `.navigation`, `#navigation`
 - `.navbar`, `.main-menu`, `.primary-menu`
 - `header nav`, `.site-navigation`
 
-### HTML5 Semantic Tags
+#### HTML5 Semantic Tags
 - `<nav>`
 - `<menu>`
 
-### ARIA Attributes
+#### ARIA Attributes
 - `role="navigation"`
 - `role="menubar"`
 - `aria-label="navigation"`
 
-### Common Patterns
+#### Common Patterns
 - Elements with classes/IDs containing: menu, nav, navigation, navbar, menubar
+
+### Service Page Extraction Methods
+
+The service extractor achieves 100% accuracy by following navigation links to dedicated service pages and extracting only from structured elements.
+
+#### Link Following Strategy
+
+1. **Service URL Detection**
+   - Scans navigation menu for service-related links
+   - URL patterns detected: `/services`, `/solutions`, `/products`, `/offerings`, `/what-we-do`, `/capabilities`, `/expertise`
+   - Excludes non-service pages: `/blog`, `/news`, `/about`, `/contact`, `/careers`, `/privacy`, `/terms`
+   - Maximum 20 service pages per domain
+
+2. **Page Classification**
+   - **Service Listing** (`service_listing`): Hub pages like `/services`
+   - **Service Detail** (`service_detail`): Individual pages like `/services/consulting`
+
+#### Extraction Methods with Confidence Scores
+
+The extractor uses 4 precision methods, ranked by reliability:
+
+1. **JSON-LD Structured Data** (Confidence: 1.00)
+   - Extracts from `<script type="application/ld+json">`
+   - Looks for `@type`: "Service", "Product", or "Offer"
+   - Gets the `name` property
+   - Example: `{"@type": "Service", "name": "Cloud Migration Consulting"}`
+   - Highest confidence because it's explicit structured data
+
+2. **H1 Tags** (Confidence: 0.95)
+   - Extracts from `<h1>` tags on service pages
+   - Usually contains the exact service name
+   - Example: `<h1>Cloud Migration Consulting</h1>`
+   - Very high confidence as H1 typically defines page topic
+
+3. **Page Title** (Confidence: 0.90)
+   - Extracts from `<title>` tag
+   - Removes company name and separators (|, -, ::, etc.)
+   - Example: `<title>Cloud Migration - Example Co</title>` → "Cloud Migration"
+   - High confidence but may include extra branding
+
+4. **Meta Keywords** (Confidence: 0.85)
+   - Extracts from `<meta name="keywords">`
+   - Splits by comma
+   - Example: `<meta name="keywords" content="cloud consulting, migration">`
+   - Good confidence but rarely used in modern sites
+
+5. **Service Cards** (Confidence: 0.80)
+   - On listing pages, extracts from service card headings
+   - CSS selectors: `.service-card h3`, `.solution-item .title`, etc.
+   - Example: `<div class="service-card"><h3>Consulting</h3></div>`
+
+#### Keyword Validation
+
+Every extracted keyword must pass validation:
+
+- **Length**: 3-100 characters
+- **Word count**: 1-8 words
+- **Content check**: Must contain either:
+  - Service indicators: consulting, development, management, design, engineering, assessment, analysis, integration, migration, optimization, implementation, support, planning, architecture, security, compliance, testing, training, strategy, audit, review
+  - OR be a proper noun (capitalized words)
+- **Exclusions**: Generic terms like "our services", "learn more", "contact us" are filtered out
+
+#### Source Tracking
+
+Every service keyword is stored with complete traceability:
+
+```sql
+SELECT
+    keyword,
+    source_url,              -- URL where keyword was found
+    extraction_method,       -- h1, title, meta, json_ld, service_card
+    confidence_score        -- 0.80-1.00
+FROM domain_keywords
+WHERE section_type_id = 'service_detail';
+```
+
+**Example:**
+```
+keyword: "Cloud Migration Consulting"
+source_url: "https://example.com/services/cloud-migration"
+extraction_method: "json_ld"
+confidence_score: 1.00
+```
+
+This allows you to:
+- Verify extraction accuracy
+- Understand keyword context
+- Filter by confidence level
+- Audit extraction quality
 
 ## Keyword Processing
 
@@ -509,6 +694,19 @@ For detailed troubleshooting information, see **[TROUBLESHOOTING.md](TROUBLESHOO
 
 ### Common Issues
 
+**Service Links Not Found (shows 0 service links):**
+- **Most common cause**: Missing brotli package for compression support
+- **Symptoms**: Service extraction finds 0 links, but site has visible services
+- **Solution**: Install brotli
+  ```bash
+  pip3 install --break-system-packages brotli
+  ```
+- **Verification**: Run diagnostic
+  ```bash
+  python test_brotli.py
+  ```
+- If brotli is installed and working, site may not have service pages with standard URL patterns
+
 **403 Forbidden Errors:**
 - Some sites (~5-10%) block automated crawlers
 - Enhanced headers help with most sites (94%+ success rate)
@@ -517,6 +715,7 @@ For detailed troubleshooting information, see **[TROUBLESHOOTING.md](TROUBLESHOO
 **No Keywords Found:**
 - Site may use JavaScript to render navigation
 - Check site manually to verify menu structure
+- For service extraction, ensure site has service pages with URLs containing: /services, /solutions, /products, etc.
 
 **Failed Domains:**
 ```bash

@@ -398,6 +398,92 @@ class DatabaseManager:
 
         return total_keywords, new_keywords
 
+    def store_keywords_with_source(
+        self,
+        company_id: int,
+        keywords_data: Dict[str, Dict],
+        section_type_id: int
+    ) -> Tuple[int, int]:
+        """
+        Store keywords with source tracking (URL, method, confidence).
+
+        Args:
+            company_id: Company ID
+            keywords_data: Dict of {keyword: {'confidence': float, 'method': str, 'url': str}}
+            section_type_id: Section type ID
+
+        Returns:
+            Tuple of (total_keywords, new_keywords)
+        """
+        if not keywords_data:
+            return 0, 0
+
+        new_keywords = 0
+        total_keywords = len(keywords_data)
+
+        with self.get_connection() as conn:
+            with conn.cursor() as cur:
+                for keyword, metadata in keywords_data.items():
+                    from utils import normalize_keyword
+                    normalized = normalize_keyword(keyword)
+
+                    if not normalized:
+                        continue
+
+                    # Get or create keyword in master table
+                    keyword_id = self.get_or_create_keyword(keyword, normalized)
+
+                    # Check if this keyword+source combination already exists
+                    cur.execute("""
+                        SELECT id FROM domain_keywords
+                        WHERE company_id = %s
+                        AND keyword_id = %s
+                        AND section_type_id = %s
+                        AND (source_url = %s OR source_url IS NULL)
+                    """, (company_id, keyword_id, section_type_id, metadata.get('url')))
+
+                    if cur.fetchone():
+                        # Update existing record
+                        cur.execute("""
+                            UPDATE domain_keywords
+                            SET page_count = page_count + 1,
+                                total_frequency = total_frequency + 1,
+                                last_seen = CURRENT_TIMESTAMP,
+                                source_url = %s,
+                                extraction_method = %s,
+                                confidence_score = %s
+                            WHERE company_id = %s
+                            AND keyword_id = %s
+                            AND section_type_id = %s
+                        """, (
+                            metadata.get('url'),
+                            metadata.get('method'),
+                            metadata.get('confidence'),
+                            company_id,
+                            keyword_id,
+                            section_type_id
+                        ))
+                    else:
+                        # Insert new record with source tracking
+                        cur.execute("""
+                            INSERT INTO domain_keywords
+                            (company_id, keyword_id, section_type_id, source_url, extraction_method, confidence_score)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (
+                            company_id,
+                            keyword_id,
+                            section_type_id,
+                            metadata.get('url'),
+                            metadata.get('method'),
+                            metadata.get('confidence')
+                        ))
+                        new_keywords += 1
+
+                # Update keyword statistics
+                self._update_keyword_statistics(cur, company_id)
+
+        return total_keywords, new_keywords
+
     def _update_keyword_statistics(self, cur, company_id: int) -> None:
         """
         Update keyword master statistics.

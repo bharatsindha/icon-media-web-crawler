@@ -12,6 +12,11 @@ from urllib3.util.retry import Retry
 from config import Config
 from database import DatabaseManager
 from parser import MenuParser
+from service_extractor import (
+    NavigationLinkFollower,
+    ServicePageExtractor,
+    ServiceListingExtractor
+)
 from utils import (
     RateLimiter,
     ProgressTracker,
@@ -196,6 +201,170 @@ class WebCrawler:
 
         return result
 
+    def crawl_services(self, domain: str, company_id: int) -> Dict:
+        """
+        Crawl service pages by following navigation links.
+
+        Args:
+            domain: Domain to crawl
+            company_id: Company ID
+
+        Returns:
+            Dictionary with crawl results
+        """
+        result = {
+            'success': False,
+            'domain': domain,
+            'keywords_found': 0,
+            'new_keywords': 0,
+            'error': None,
+            'pages_crawled': 0,
+            'pages_failed': 0,
+            'service_links_found': 0
+        }
+
+        try:
+            logger.info(f"Starting service extraction for domain: {domain}")
+
+            # Build full URL
+            url = build_full_url(domain)
+
+            # Validate URL
+            if not is_valid_url(url):
+                raise ValueError(f"Invalid URL: {url}")
+
+            # Check robots.txt if enabled
+            if Config.RESPECT_ROBOTS_TXT:
+                if not check_robots_txt(url, Config.USER_AGENT):
+                    raise ValueError(f"Crawling disallowed by robots.txt: {url}")
+
+            # Apply rate limiting
+            self.rate_limiter.wait()
+
+            # Fetch homepage
+            logger.info(f"Fetching homepage: {url}")
+            html_content = self._fetch_page(url)
+
+            if not html_content:
+                raise ValueError("Failed to fetch homepage content")
+
+            # Find service links from navigation
+            service_links = NavigationLinkFollower.find_service_links(html_content, url, max_links=20)
+            result['service_links_found'] = len(service_links)
+
+            if not service_links:
+                logger.warning(f"No service links found for {domain}")
+                result['success'] = True  # Not an error, just no services found
+                return result
+
+            logger.info(f"Found {len(service_links)} service links to crawl")
+
+            total_keywords = 0
+            total_new = 0
+
+            # Process each service link
+            for idx, link_info in enumerate(service_links, 1):
+                service_url = link_info['url']
+                service_type = link_info['type']  # 'service_detail' or 'service_listing'
+
+                try:
+                    logger.info(f"Crawling service page {idx}/{len(service_links)}: {service_url}")
+
+                    # Apply rate limiting between pages
+                    if idx > 1:
+                        self.rate_limiter.wait()
+
+                    # Fetch service page
+                    service_html = self._fetch_page(service_url)
+
+                    if not service_html:
+                        logger.warning(f"Failed to fetch service page: {service_url}")
+                        result['pages_failed'] += 1
+                        continue
+
+                    result['pages_crawled'] += 1
+
+                    # Extract keywords based on page type
+                    if service_type == 'service_detail':
+                        keywords_data = ServicePageExtractor.extract_keywords(service_html, service_url)
+                    else:  # service_listing
+                        keywords_data = ServiceListingExtractor.extract_keywords(service_html, service_url)
+
+                    if keywords_data:
+                        # Get section type ID
+                        section_type_id = self.db.get_section_type_id(service_type)
+
+                        if not section_type_id:
+                            logger.error(f"Section type '{service_type}' not found in database")
+                            continue
+
+                        # Store keywords with source tracking
+                        total, new = self.db.store_keywords_with_source(
+                            company_id,
+                            keywords_data,
+                            section_type_id
+                        )
+
+                        total_keywords += total
+                        total_new += new
+
+                        logger.info(
+                            f"Extracted {total} keywords ({new} new) from {service_url}"
+                        )
+                    else:
+                        logger.debug(f"No keywords extracted from {service_url}")
+
+                except Exception as e:
+                    logger.error(f"Error processing service page {service_url}: {e}")
+                    result['pages_failed'] += 1
+                    continue
+
+            # Update final results
+            result['keywords_found'] = total_keywords
+            result['new_keywords'] = total_new
+            result['success'] = True
+
+            logger.info(
+                f"Successfully crawled services for {domain}: "
+                f"{total_keywords} keywords ({total_new} new) from {result['pages_crawled']} pages"
+            )
+
+        except requests.exceptions.Timeout:
+            error = f"Request timeout for {domain}"
+            logger.error(error)
+            result['error'] = error
+            result['pages_failed'] += 1
+
+        except requests.exceptions.SSLError as e:
+            error = f"SSL error for {domain}: {str(e)}"
+            logger.error(error)
+            result['error'] = error
+            result['pages_failed'] += 1
+
+        except requests.exceptions.ConnectionError as e:
+            error = f"Connection error for {domain}: {str(e)}"
+            logger.error(error)
+            result['error'] = error
+            result['pages_failed'] += 1
+
+        except requests.exceptions.RequestException as e:
+            error = f"Request error for {domain}: {str(e)}"
+            logger.error(error)
+            result['error'] = error
+            result['pages_failed'] += 1
+
+        except ValueError as e:
+            error = str(e)
+            logger.error(error)
+            result['error'] = error
+
+        except Exception as e:
+            error = f"Unexpected error for {domain}: {str(e)}"
+            logger.error(error, exc_info=True)
+            result['error'] = error
+
+        return result
+
     def _fetch_page(self, url: str) -> Optional[str]:
         """
         Fetch HTML content from URL.
@@ -225,8 +394,13 @@ class WebCrawler:
                 logger.warning(f"Non-HTML content type: {content_type}")
                 return None
 
-            # Get encoding
-            response.encoding = response.apparent_encoding
+            # Ensure proper encoding detection and decompression
+            # Access content first to trigger decompression
+            _ = response.content
+
+            # Set encoding if not detected
+            if not response.encoding or response.encoding == 'ISO-8859-1':
+                response.encoding = response.apparent_encoding or 'utf-8'
 
             return response.text
 
@@ -276,8 +450,31 @@ class WebCrawler:
                 # Create crawl job
                 job_id = self.db.create_crawl_job(company_id)
 
-                # Crawl the domain
-                result = self.crawl_domain(domain, company_id)
+                # Step 1: Crawl navigation menu
+                logger.info(f"[{domain}] Extracting navigation menu keywords...")
+                menu_result = self.crawl_domain(domain, company_id)
+
+                # Step 2: Crawl service pages
+                logger.info(f"[{domain}] Extracting service keywords...")
+                service_result = self.crawl_services(domain, company_id)
+
+                # Combine results
+                result = {
+                    'success': menu_result['success'] and service_result['success'],
+                    'pages_crawled': menu_result['pages_crawled'] + service_result['pages_crawled'],
+                    'pages_failed': menu_result['pages_failed'] + service_result['pages_failed'],
+                    'new_keywords': menu_result['new_keywords'] + service_result['new_keywords'],
+                    'error': menu_result.get('error') or service_result.get('error'),
+                    'menu_keywords': menu_result['keywords_found'],
+                    'service_keywords': service_result['keywords_found'],
+                    'service_links': service_result.get('service_links_found', 0)
+                }
+
+                logger.info(
+                    f"[{domain}] Complete - Menu: {result['menu_keywords']} kw, "
+                    f"Services: {result['service_keywords']} kw ({result['service_links']} pages), "
+                    f"Total new: {result['new_keywords']}"
+                )
 
                 # Update job status
                 if result['success']:
