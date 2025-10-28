@@ -433,50 +433,33 @@ class DatabaseManager:
                     # Get or create keyword in master table
                     keyword_id = self.get_or_create_keyword(keyword, normalized)
 
-                    # Check if this keyword+source combination already exists
+                    # Use UPSERT (INSERT ... ON CONFLICT DO UPDATE) to handle both new and existing keywords
+                    # This prevents duplicate key errors on re-crawls
                     cur.execute("""
-                        SELECT id FROM domain_keywords
-                        WHERE company_id = %s
-                        AND keyword_id = %s
-                        AND section_type_id = %s
-                        AND (source_url = %s OR source_url IS NULL)
-                    """, (company_id, keyword_id, section_type_id, metadata.get('url')))
+                        INSERT INTO domain_keywords
+                        (company_id, keyword_id, section_type_id, source_url, extraction_method, confidence_score)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (company_id, keyword_id, section_type_id)
+                        DO UPDATE SET
+                            page_count = domain_keywords.page_count + 1,
+                            total_frequency = domain_keywords.total_frequency + 1,
+                            last_seen = CURRENT_TIMESTAMP,
+                            source_url = EXCLUDED.source_url,
+                            extraction_method = EXCLUDED.extraction_method,
+                            confidence_score = EXCLUDED.confidence_score
+                        RETURNING (xmax = 0) AS inserted
+                    """, (
+                        company_id,
+                        keyword_id,
+                        section_type_id,
+                        metadata.get('url'),
+                        metadata.get('method'),
+                        metadata.get('confidence')
+                    ))
 
-                    if cur.fetchone():
-                        # Update existing record
-                        cur.execute("""
-                            UPDATE domain_keywords
-                            SET page_count = page_count + 1,
-                                total_frequency = total_frequency + 1,
-                                last_seen = CURRENT_TIMESTAMP,
-                                source_url = %s,
-                                extraction_method = %s,
-                                confidence_score = %s
-                            WHERE company_id = %s
-                            AND keyword_id = %s
-                            AND section_type_id = %s
-                        """, (
-                            metadata.get('url'),
-                            metadata.get('method'),
-                            metadata.get('confidence'),
-                            company_id,
-                            keyword_id,
-                            section_type_id
-                        ))
-                    else:
-                        # Insert new record with source tracking
-                        cur.execute("""
-                            INSERT INTO domain_keywords
-                            (company_id, keyword_id, section_type_id, source_url, extraction_method, confidence_score)
-                            VALUES (%s, %s, %s, %s, %s, %s)
-                        """, (
-                            company_id,
-                            keyword_id,
-                            section_type_id,
-                            metadata.get('url'),
-                            metadata.get('method'),
-                            metadata.get('confidence')
-                        ))
+                    # Check if this was an insert (new keyword) or update (existing keyword)
+                    result = cur.fetchone()
+                    if result and result[0]:  # xmax = 0 means it was an INSERT
                         new_keywords += 1
 
                 # Update keyword statistics

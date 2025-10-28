@@ -10,6 +10,21 @@ navigation:
   - about us
   - about company
   - who we are
+  - our story
+  - our team
+  - our news
+  - our services
+  - our people
+  - our leadership
+  - leadership
+  - our culture
+  - company culture
+  - our history
+  - history
+  - our clients
+  - clients
+  - client list
+  - testimonials
   - contact
   - contact us
   - get in touch
@@ -24,6 +39,8 @@ navigation:
   - calendar
   - sitemap
   - menu
+  - gallery
+  - portfolio
 
 # Legal and compliance terms
 legal:
@@ -66,9 +83,21 @@ social:
   - youtube
   - instagram
   - pinterest
+  - tiktok
+  - snapchat
+  - google
+  - google maps
+  - yelp
   - social media
   - follow us
+  - follow us on
+  - find us on
+  - like us on
   - connect with us
+  - connect with us on
+  - join us on
+  - subscribe on
+  - watch us on
   - community
   - forum
   - forums
@@ -124,11 +153,25 @@ actions:
   - go
   - view all
   - see all
+  - show all
   - more
   - less
   - back
   - next
   - previous
+  - click here
+  - learn more
+  - read more
+  - view more
+  - see more
+  - discover more
+  - explore
+  - explore our
+  - discover our
+  - learn about
+  - get started
+  - find out more
+  - request info
 
 # Footer utility items
 footer:
@@ -142,13 +185,182 @@ footer:
 utility:
   - skip to content
   - skip navigation
+  - skip to main
   - close
+  - close menu
   - open
+  - open menu
   - toggle
+  - toggle menu
+  - toggle mobile menu
+  - toggle navigation
   - expand
+  - expand menu
   - collapse
+  - collapse menu
   - show
+  - show menu
   - hide
+  - hide menu
+  - scroll to
+  - back to top
+  - return to top
+  - menu
+  - navigation
+
+# Single-word industry sectors/categories (too generic when standalone)
+sectors:
+  - sectors
+  - industries
+  - markets
+  - energy
+  - mining
+  - industrial
+  - forestry
+  - agriculture
+  - transportation
+  - manufacturing
+  - retail
+  - healthcare
+  - education
+  - finance
+  - technology
+  - construction
+  - automotive
+  - aviation
+  - marine
+  - oil and gas
+
+# Single-word materials/substances (too generic when standalone)
+materials:
+  - soil
+  - water
+  - air
+  - sediment
+  - rock
+  - metal
+  - wood
+  - plastic
+  - concrete
+  - steel
+
+# Contact information patterns
+contacts:
+  - call
+  - call us
+  - phone
+  - telephone
+  - email us
+  - reach us
+  - contact us at
+  - inquiries
+  - info@
+
+# Team/staff related (not services)
+team:
+  - team lead
+  - project manager
+  - contact person
+  - reach out to
+  - meet our
+  - meet the
+  - our team
+  - staff directory
+
+# Vague headings (not specific services)
+vague_headings:
+  - our mission
+  - our vision
+  - our values
+  - our approach
+  - our commitment
+  - why choose us
+  - why us
+  - what we do
+  - who we are
+  - welcome to
+  - welcome
+  - overview
+  - introduction
+
+# Locations - US and Canadian cities/regions (not services)
+# Common locations that appear on company websites
+locations:
+  # California cities
+  - bakersfield
+  - fresno
+  - sacramento
+  - san francisco
+  - san diego
+  - san jose
+  - los angeles
+  - oakland
+  - san bernardino
+  - riverside
+  - anaheim
+  - santa ana
+  - irvine
+  # Other major US cities
+  - new york
+  - chicago
+  - houston
+  - phoenix
+  - philadelphia
+  - dallas
+  - seattle
+  - denver
+  - boston
+  - atlanta
+  - miami
+  - portland
+  - las vegas
+  - detroit
+  - minneapolis
+  - tampa
+  - st louis
+  - baltimore
+  - charlotte
+  - orlando
+  # Canadian cities
+  - vancouver
+  - toronto
+  - montreal
+  - calgary
+  - ottawa
+  - edmonton
+  - winnipeg
+  - quebec
+  - hamilton
+  - victoria
+  # Directional/regional terms
+  - corporate headquarters
+  - head office
+  - main office
+  - branch office
+  - regional office
+  - hours of operation
+  - office locations
+  - our locations
+  - find us
+
+# CTAs and utility phrases that aren't services
+ctas_utility:
+  - have questions
+  - have questions?
+  - questions?
+  - need help
+  - need help?
+  - get help
+  - request a quote
+  - request quote
+  - free consultation
+  - schedule a call
+  - book now
+  - soq downloads
+  - download soq
+  - like us on facebook
+  - follow on linkedin
+  - watch on youtube
 
 # Patterns to exclude (supports wildcards)
 # Use * for any characters, ? for single character
@@ -160,6 +372,41 @@ patterns:
   - "all rights*"
   - "skip to*"
   - "skip navigation*"
+  - "*@*"  # Email addresses
+  - "find us on *"
+  - "follow us on *"
+  - "connect on *"
+  - "team lead*"
+  - "contact*---*"  # Contact info with dashes
+  - "*---*"  # Multiple dashes (often formatting)
+  # Date/timestamp patterns (blog posts, news articles)
+  - "*january*2*"
+  - "*february*2*"
+  - "*march*2*"
+  - "*april*2*"
+  - "*may*2*"
+  - "*june*2*"
+  - "*july*2*"
+  - "*august*2*"
+  - "*september*2*"
+  - "*october*2*"
+  - "*november*2*"
+  - "*december*2*"
+  - "*jan*2*"
+  - "*feb*2*"
+  - "*mar*2*"
+  - "*apr*2*"
+  - "*jun*2*"
+  - "*jul*2*"
+  - "*aug*2*"
+  - "*sep*2*"
+  - "*oct*2*"
+  - "*nov*2*"
+  - "*dec*2*"
+  - "* - *am"  # Matches "Title - 5:34 am"
+  - "* - *pm"  # Matches "Title - 4:58 pm"
+  - "*202* - *"  # Matches "Title with year 2020 - time"
+  - "*201* - *"  # Matches "Title with year 2019 - time"
 
 # Configuration options
 config:

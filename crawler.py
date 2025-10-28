@@ -241,15 +241,21 @@ class WebCrawler:
             # Apply rate limiting
             self.rate_limiter.wait()
 
-            # Fetch homepage
+            # Fetch homepage with final URL (handles redirects like example.com -> www.example.com)
             logger.info(f"Fetching homepage: {url}")
-            html_content = self._fetch_page(url)
+            fetch_result = self._fetch_page_with_url(url)
 
-            if not html_content:
+            if not fetch_result:
                 raise ValueError("Failed to fetch homepage content")
 
-            # Find service links from navigation
-            service_links = NavigationLinkFollower.find_service_links(html_content, url, max_links=20)
+            html_content, final_url = fetch_result
+
+            # Log if redirect occurred
+            if final_url != url:
+                logger.info(f"Redirect detected: {url} -> {final_url}")
+
+            # Find service links from navigation using final URL (ensures same-domain check works after redirects)
+            service_links = NavigationLinkFollower.find_service_links(html_content, final_url, max_links=20)
             result['service_links_found'] = len(service_links)
 
             if not service_links:
@@ -375,6 +381,19 @@ class WebCrawler:
         Returns:
             HTML content or None on failure
         """
+        result = self._fetch_page_with_url(url)
+        return result[0] if result else None
+
+    def _fetch_page_with_url(self, url: str) -> Optional[tuple[str, str]]:
+        """
+        Fetch HTML content and final URL from URL (after redirects).
+
+        Args:
+            url: URL to fetch
+
+        Returns:
+            Tuple of (HTML content, final URL after redirects) or None on failure
+        """
         try:
             logger.debug(f"Fetching {url}")
 
@@ -402,7 +421,8 @@ class WebCrawler:
             if not response.encoding or response.encoding == 'ISO-8859-1':
                 response.encoding = response.apparent_encoding or 'utf-8'
 
-            return response.text
+            # Return both HTML content and final URL (after any redirects)
+            return (response.text, response.url)
 
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTP error fetching {url}: {e}")
@@ -579,8 +599,28 @@ class WebCrawler:
             job_id = self.db.create_crawl_job(company_id)
             logger.info(f"Created crawl job: {job_id}")
 
-            # Crawl the domain
-            result = self.crawl_domain(normalized_domain, company_id)
+            # Step 1: Crawl navigation menu (section_type_id=1)
+            logger.info("Step 1: Extracting navigation menu keywords...")
+            menu_result = self.crawl_domain(normalized_domain, company_id)
+
+            # Step 2: Crawl service pages (section_type_id=5,6)
+            logger.info("Step 2: Extracting service keywords from dedicated pages...")
+            service_result = self.crawl_services(normalized_domain, company_id)
+
+            # Combine results from all section types
+            result = {
+                'success': menu_result['success'] and service_result['success'],
+                'menu_keywords': menu_result['keywords_found'],
+                'menu_new': menu_result['new_keywords'],
+                'service_keywords': service_result['keywords_found'],
+                'service_new': service_result['new_keywords'],
+                'service_links_found': service_result['service_links_found'],
+                'pages_crawled': menu_result['pages_crawled'] + service_result['pages_crawled'],
+                'pages_failed': menu_result['pages_failed'] + service_result['pages_failed'],
+                'error': menu_result.get('error') or service_result.get('error'),
+                'keywords_found': menu_result['keywords_found'] + service_result['keywords_found'],
+                'new_keywords': menu_result['new_keywords'] + service_result['new_keywords']
+            }
 
             # Update job and company status
             if result['success']:
@@ -593,17 +633,28 @@ class WebCrawler:
                 )
                 self.db.update_company_status(company_id, 'completed')
 
-                # Print summary
+                # Print comprehensive summary
                 print("\n" + "=" * 70)
-                print("CRAWL RESULTS")
+                print("COMPLETE EXTRACTION RESULTS")
                 print("=" * 70)
-                print(f"Domain:          {normalized_domain}")
-                print(f"Status:          SUCCESS")
-                print(f"Keywords found:  {result['keywords_found']}")
-                print(f"New keywords:    {result['new_keywords']}")
-                print(f"Pages crawled:   {result['pages_crawled']}")
-                print(f"Pages failed:    {result['pages_failed']}")
-                print(f"Job ID:          {job_id}")
+                print(f"Domain:              {normalized_domain}")
+                print(f"Status:              SUCCESS")
+                print()
+                print("Menu Extraction:")
+                print(f"  Keywords found:    {result['menu_keywords']}")
+                print(f"  New keywords:      {result['menu_new']}")
+                print()
+                print("Service Extraction:")
+                print(f"  Service links:     {result['service_links_found']}")
+                print(f"  Keywords found:    {result['service_keywords']}")
+                print(f"  New keywords:      {result['service_new']}")
+                print()
+                print("Total:")
+                print(f"  Keywords found:    {result['keywords_found']}")
+                print(f"  New keywords:      {result['new_keywords']}")
+                print(f"  Pages crawled:     {result['pages_crawled']}")
+                print(f"  Pages failed:      {result['pages_failed']}")
+                print(f"Job ID:              {job_id}")
                 print("=" * 70 + "\n")
 
                 return True
@@ -623,7 +674,7 @@ class WebCrawler:
 
                 # Print error summary
                 print("\n" + "=" * 70)
-                print("CRAWL RESULTS")
+                print("COMPLETE EXTRACTION RESULTS")
                 print("=" * 70)
                 print(f"Domain:          {normalized_domain}")
                 print(f"Status:          FAILED")
