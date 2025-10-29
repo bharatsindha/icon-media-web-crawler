@@ -1132,6 +1132,12 @@ class ServiceListingExtractor:
             '.item h3', '.item h4', '.item .title',
             '.tile h3', '.tile h4', '.tile .title',
 
+            # Accordion/toggle patterns (for collapsed service sections)
+            '.panel-title', '.panel-title h4', '.panel-heading h4',
+            '.accordion .panel h4', '.accordion h4',
+            '.toggle-heading', '.fusion-toggle-heading',
+            '.collapse-toggle', '.accordion-title',
+
             # List patterns
             '.capabilities-list li', '.expertise-list li',
             '.features-list li a', '.portfolio-list li a',
