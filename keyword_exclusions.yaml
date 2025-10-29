@@ -31,6 +31,13 @@ navigation:
   - careers
   - jobs
   - work with us
+  - join our team
+  - your career at ea
+  - your path to a new career
+  - apply for jobs
+  - great benefits
+  - work-life balance
+  - collaboration and self development
   - blog
   - news
   - press
@@ -41,6 +48,32 @@ navigation:
   - menu
   - gallery
   - portfolio
+  - projects
+  - about cti
+  - experience
+  - our experience
+  - mission vision values
+  - vision and values
+  - our market sectors
+  - market sectors
+  - representative projects
+  - services
+  - about ea
+  - who we are
+  - our history and commitment
+  - president's message
+  - core ideology
+  - employee-owned public benefit corporation
+  - the future
+  - corporate sustainability
+  - community support
+  - insights
+  - conferences/news
+  - office locations
+  - ea on social media
+  - connect with us
+  - connectwith us
+  - ea corporate headquarters
 
 # Legal and compliance terms
 legal:
@@ -108,6 +141,7 @@ authentication:
   - log in
   - sign in
   - signin
+  - employee login
   - register
   - sign up
   - signup
@@ -207,6 +241,26 @@ utility:
   - return to top
   - menu
   - navigation
+  - footer bottom
+
+# Business development and partnerships
+business_development:
+  - doing business with
+  - doing business with ea
+  - gsa contracts
+  - professional corporations/affiliates
+  - subcontractors/suppliers
+  - supplier program
+  - industry involvement
+  - public and private sector support
+
+# Marketing and value propositions
+marketing:
+  - client satisfaction
+  - client-focused support
+  - delivering "best value" solutions
+  - the depth and breadth of experience you need
+  - industry recognition
 
 # Single-word industry sectors/categories (too generic when standalone)
 sectors:
@@ -334,6 +388,7 @@ locations:
   - victoria
   # Directional/regional terms
   - corporate headquarters
+  - corporate hq
   - head office
   - main office
   - branch office
@@ -342,6 +397,10 @@ locations:
   - office locations
   - our locations
   - find us
+  - asheville office
+  - cincinnati office
+  - denver office
+  - huntington office
 
 # CTAs and utility phrases that aren't services
 ctas_utility:
@@ -379,6 +438,19 @@ patterns:
   - "team lead*"
   - "contact*---*"  # Contact info with dashes
   - "*---*"  # Multiple dashes (often formatting)
+  # Office location patterns
+  - "* office"  # Matches "Denver Office", "Cincinnati Office", etc.
+  - "*office"  # Matches "CincinnatiOffice" (no space variants)
+  # Blog/archive patterns
+  - "* archives"  # Matches "Industrial Services Archives", "News Archives", etc.
+  - "*archives"  # Matches "ServicesArchives" (no space variants)
+  # Question-based blog titles
+  - "are you ready*"
+  - "do you know*"
+  - "have you considered*"
+  - "what is*"
+  - "how to*"
+  - "why*"
   # Date/timestamp patterns (blog posts, news articles)
   - "*january*2*"
   - "*february*2*"
