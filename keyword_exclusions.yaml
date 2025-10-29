@@ -74,6 +74,11 @@ navigation:
   - connect with us
   - connectwith us
   - ea corporate headquarters
+  - mission
+  - people
+  - expertise
+  - industry influence
+  - public access
 
 # Legal and compliance terms
 legal:
@@ -206,6 +211,12 @@ actions:
   - get started
   - find out more
   - request info
+  - call
+  - pay now
+  - close alert
+  - close
+  - open
+  - accessibility statement
 
 # Footer utility items
 footer:
@@ -320,6 +331,8 @@ team:
   - meet the
   - our team
   - staff directory
+  - meet our experts
+  - meet our team
 
 # Vague headings (not specific services)
 vague_headings:
@@ -330,6 +343,9 @@ vague_headings:
   - our commitment
   - why choose us
   - why us
+  - project experience
+  - services utilized
+  - posts pagination
   - what we do
   - who we are
   - welcome to

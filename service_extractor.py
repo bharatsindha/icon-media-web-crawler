@@ -1131,6 +1131,7 @@ class ServiceListingExtractor:
             '.card h3', '.card h4', '.card .title',
             '.item h3', '.item h4', '.item .title',
             '.tile h3', '.tile h4', '.tile .title',
+            '.expertise-title', '.expertise-card h3', '.expertise-item h3',
 
             # Accordion/toggle patterns (for collapsed service sections)
             '.panel-title', '.panel-title h4', '.panel-heading h4',
