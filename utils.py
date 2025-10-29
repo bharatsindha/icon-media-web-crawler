@@ -226,28 +226,40 @@ def sanitize_text(text: str) -> str:
     # 1. Add space between camelCase words (e.g., "SurveysUsing" → "Surveys Using")
     text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
 
-    # 2. Remove multiple dashes/em-dashes (formatting artifacts)
+    # 2. Remove icon/UI text artifacts (SVG aria-labels, icon fonts)
+    icon_patterns = [
+        r'^Checkmark\s*',  # Checkmark icons at start (e.g., "CheckmarkAir monitoring")
+        r'\s*caret-right\s*$', r'\s*caret-left\s*$',  # Arrow icons at end
+        r'\s*arrow-right\s*$', r'\s*arrow-left\s*$',  # Alternative arrow text
+        r'^Search\s+Search$',  # Duplicated search text
+        r'^Toggle\s+',  # Toggle UI elements
+        r'^Icon\s*',  # Generic icon text
+    ]
+    for pattern in icon_patterns:
+        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+
+    # 3. Remove multiple dashes/em-dashes (formatting artifacts)
     text = re.sub(r'[-—]{2,}', ' ', text)
 
-    # 3. Truncate at email addresses (contact info shouldn't be in keywords)
+    # 4. Truncate at email addresses (contact info shouldn't be in keywords)
     if '@' in text:
         text = text.split('@')[0].strip()
 
-    # 4. Truncate at phone numbers (various formats)
+    # 5. Truncate at phone numbers (various formats)
     # Match patterns like: 555-1234, 555.1234, (555) 1234
     phone_match = re.search(r'\d{3}[-.\s)]\d{3,4}', text)
     if phone_match:
         text = text[:phone_match.start()].strip()
 
-    # 5. Remove excessive punctuation
+    # 6. Remove excessive punctuation
     text = re.sub(r'[.]{2,}', '', text)  # Multiple periods
     text = re.sub(r'[!]{2,}', '', text)  # Multiple exclamation marks
 
-    # 6. Clean up whitespace
+    # 7. Clean up whitespace
     text = re.sub(r'\s+', ' ', text)  # Multiple spaces → single space
     text = text.strip()  # Leading/trailing whitespace
 
-    # 7. Remove leading/trailing punctuation (but preserve internal)
+    # 8. Remove leading/trailing punctuation (but preserve internal)
     text = text.strip('.,;:!?\'"`()[]{}')
 
     return text

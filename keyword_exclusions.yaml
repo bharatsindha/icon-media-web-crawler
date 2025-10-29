@@ -49,6 +49,16 @@ navigation:
   - gallery
   - portfolio
   - projects
+  - articles
+  - case studies
+  - whitepapers
+  - white papers
+  - business insights
+  - insights
+  - by industry
+  - by technology
+  - by function
+  - by service
   - about cti
   - experience
   - our experience
@@ -350,8 +360,21 @@ vague_headings:
   - who we are
   - welcome to
   - welcome
+  - service highlights
+  - corporate office
+  - delivering technical excellence and beyond
+  - thoughtful natural resources consulting solutions to exceed your expectations
+  - we uncover the right approach so you can achieve your vision
   - overview
   - introduction
+  - revolutionize your company
+  - outwork the competition
+  - unify it & business for success
+  - collaborate. streamline. succeed
+  - integration. automation. innovation
+  - innovation. excellence. evolution
+  - quality. knowledge. performance
+  - quality. knowledge. performace
 
 # Locations - US and Canadian cities/regions (not services)
 # Common locations that appear on company websites
@@ -454,6 +477,36 @@ patterns:
   - "team lead*"
   - "contact*---*"  # Contact info with dashes
   - "*---*"  # Multiple dashes (often formatting)
+  # CTA (Call-to-Action) patterns
+  - "contact us for*"  # Matches "Contact us for air quality compliance solutions"
+  - "talk to our*"  # Matches "Talk to our service expert"
+  - "talk to*"  # Matches "Talk to our service experts"
+  - "view related*"  # Matches "View related resources"
+  - "see us at*"  # Matches "See us at work"
+  - "learn more about*"  # Generic CTA
+  - "discover our*"  # Generic CTA
+  - "explore our*"  # Generic CTA
+  - "let's get started"  # Generic CTA
+  - "get started*"  # Generic CTA
+  - "are you ready for*"  # Question-based CTA
+  - "ready to*"  # Question-based CTA
+  # Descriptive/promotional phrase patterns
+  - "advantages of *"  # "Advantages of AWS Cloud Services"
+  - "benefits of *"  # "Benefits of cloud migration"
+  - "download the *"  # "Download the Workato Platform Overview brochure"
+  - "download our *"  # "Download our whitepaper"
+  - "the value proposition *"  # Marketing copy
+  - "capture & nurture *"  # Marketing copy
+  - "capture and nurture *"  # Alternative phrasing
+  # UI element patterns
+  - "service highlights"  # Page section header
+  - "toggle*menu"  # Navigation UI
+  - "sub menu"  # Navigation UI
+  - "search search"  # Duplicated search text
+  - "view all*"  # View all links
+  # Company name patterns (not services)
+  - "haley & aldrich*"  # Company mentions
+  - "haley and aldrich*"  # Alternative spelling
   # Office location patterns
   - "* office"  # Matches "Denver Office", "Cincinnati Office", etc.
   - "*office"  # Matches "CincinnatiOffice" (no space variants)

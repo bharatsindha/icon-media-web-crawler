@@ -49,6 +49,8 @@ class NavigationLinkFollower:
         '/packages', '/plans', '/pricing',  # Service tiers
         '/brands', '/collections', '/catalog',  # Retail/Manufacturing
         '/methodologies', '/frameworks', '/approaches',  # Consulting
+        '/laboratory', '/laboratories', '/lab', '/labs',  # Laboratory/testing services
+        '/engineering',  # Engineering services
 
         # Compound URL patterns (without leading slash to catch /environmental-services, /managed-services, etc.)
         # These catch URLs like /environmental-services, /professional-solutions, /technical-products
@@ -270,7 +272,41 @@ class ServicePageExtractor:
         r'^\s*[a-z]\)\s*$',  # Just letters (a), b), etc.)
         r'^Our\s+',  # Starts with "Our " (Our News, Our Team, etc.)
         r'\.$',  # Ends with period (likely a sentence/description)
+        r'^\w+\.\s+\w+\.\s+\w+\.?$',  # Marketing taglines: "Word. Word. Word."
     ]
+
+    @staticmethod
+    def remove_icon_elements(element):
+        """
+        Remove SVG, icon font, and other visual-only elements before text extraction.
+
+        Args:
+            element: BeautifulSoup element
+
+        Returns:
+            Element with icon elements removed (modifies in place)
+        """
+        if not element:
+            return element
+
+        # Remove SVG elements (often used for icons)
+        for svg in element.find_all('svg'):
+            svg.decompose()
+
+        # Remove elements with common icon class patterns
+        icon_classes = ['icon', 'fa-', 'fas-', 'far-', 'fal-', 'fab-']
+        for tag in element.find_all(class_=True):
+            classes = ' '.join(tag.get('class', []))
+            if any(icon_class in classes for icon_class in icon_classes):
+                tag.decompose()
+
+        # Remove common icon font elements (i, span with icon classes)
+        for tag in element.find_all(['i', 'span']):
+            classes = ' '.join(tag.get('class', []))
+            if any(icon_class in classes for icon_class in icon_classes):
+                tag.decompose()
+
+        return element
 
     # Description indicators (phrases that suggest text is a description, not a service name)
     DESCRIPTION_INDICATORS = [
@@ -466,11 +502,32 @@ class ServicePageExtractor:
                 logger.debug(f"Accepted single-word from offering card: {text}")
                 return True
 
+            # EXCEPTION: Trust single words from H1 tags (high-confidence source)
+            if extraction_method == 'h1':
+                logger.debug(f"Accepted single-word from H1: {text}")
+                return True
+
+            # EXCEPTION: Trust single words from lists under service headings (context-aware)
+            if extraction_method == 'lists':
+                logger.debug(f"Accepted single-word from list (context-aware): {text}")
+                return True
+
             # For other sources, apply stricter validation
             # Allow only if contains offering indicator OR is a compound term
             has_indicator = any(term in text_lower for term in ServicePageExtractor.OFFERING_INDICATORS)
-            is_compound = '-' in text or len(text) > 10  # Like "Bioremediation"
-            if not (has_indicator or is_compound):
+            is_compound = '-' in text or len(text) >= 8  # Lowered from 9 to 8 to catch shorter terms like "Escorts"
+
+            # Also accept common single-word service terms
+            common_service_terms = {
+                'surveying', 'engineering', 'consulting', 'testing', 'analysis',
+                'inspection', 'monitoring', 'remediation', 'restoration', 'assessment',
+                'design', 'planning', 'installation', 'maintenance', 'construction',
+                'fabrication', 'manufacturing', 'laboratory', 'radiochemistry',
+                'escorts', 'packaging', 'technicians'
+            }
+            is_common_service = text_lower in common_service_terms
+
+            if not (has_indicator or is_compound or is_common_service):
                 logger.debug(f"Excluded (single word without indicator): {text}")
                 return False
 
@@ -485,7 +542,9 @@ class ServicePageExtractor:
         # Must have at least 2 words and look like a service name
         if word_count >= 2:
             # Check if it's a proper noun phrase (capitalized appropriately)
-            is_proper_phrase = words[0][0].isupper() if words[0] else False
+            # Also accept phrases starting with numbers (e.g., "3D laser scanning")
+            first_char = words[0][0] if words[0] else ''
+            is_proper_phrase = first_char.isupper() or first_char.isdigit()
 
             # Check for version markers (products)
             has_version = any(marker in text_lower for marker in [
@@ -587,6 +646,8 @@ class ServicePageExtractor:
         """
         Extract offering keywords from H1 tags.
 
+        Handles pipe-separated services (e.g., "SUE | Surveying | 3D laser scanning")
+
         Args:
             soup: BeautifulSoup object
 
@@ -598,9 +659,20 @@ class ServicePageExtractor:
 
         for h1 in h1_tags:
             text = sanitize_text(h1.get_text(strip=True))
-            if ServicePageExtractor.is_valid_offering_keyword(text):
-                keywords.append((text, 0.95))  # High confidence for H1
-                logger.debug(f"Extracted from H1: {text}")
+
+            # Check if H1 contains pipe-separated services
+            if '|' in text:
+                # Split by pipe and validate each part
+                parts = [sanitize_text(part) for part in text.split('|')]
+                for part in parts:
+                    if part and ServicePageExtractor.is_valid_offering_keyword(part, extraction_method='h1'):
+                        keywords.append((part, 0.95))  # High confidence for H1
+                        logger.debug(f"Extracted from H1 (pipe-separated): {part}")
+            else:
+                # Single service in H1
+                if ServicePageExtractor.is_valid_offering_keyword(text, extraction_method='h1'):
+                    keywords.append((text, 0.95))  # High confidence for H1
+                    logger.debug(f"Extracted from H1: {text}")
 
         return keywords
 
@@ -797,12 +869,18 @@ class ServicePageExtractor:
                 if ServicePageExtractor.is_navigation_or_sidebar(li):
                     continue
 
-                text = li.get_text(strip=True)
+                # Create a copy to avoid modifying original DOM
+                li_copy = li.__copy__()
+
+                # Remove icon elements before extracting text
+                ServicePageExtractor.remove_icon_elements(li_copy)
+
+                text = li_copy.get_text(strip=True)
 
                 # Clean up common list artifacts
                 text = text.strip('•').strip('-').strip()
 
-                if ServicePageExtractor.is_valid_offering_keyword(text):
+                if ServicePageExtractor.is_valid_offering_keyword(text, extraction_method='lists'):
                     list_items.append(text)
 
             # Quality check: If we found service-related items, add them
@@ -1148,7 +1226,11 @@ class ServiceListingExtractor:
             try:
                 elements = soup.select(selector)
                 for elem in elements:
-                    text = elem.get_text(strip=True)
+                    # Create a copy and remove icon elements
+                    elem_copy = elem.__copy__()
+                    ServicePageExtractor.remove_icon_elements(elem_copy)
+
+                    text = elem_copy.get_text(strip=True)
                     if ServicePageExtractor.is_valid_offering_keyword(text, extraction_method='offering_card'):
                         keywords.append((text, 0.80))
                         logger.debug(f"Extracted from offering card ({selector}): {text}")
@@ -1180,6 +1262,10 @@ class ServiceListingExtractor:
 
         # Extract from offering cards (expanded patterns)
         keywords = ServiceListingExtractor.extract_from_offering_cards(soup)
+
+        # Extract from H1 (pipe-separated services like "SUE | Surveying | 3D laser scanning")
+        h1_keywords = ServicePageExtractor.extract_from_h1(soup)
+        keywords.extend(h1_keywords)
 
         # Also extract from H2/H3 in main content (often category names)
         for heading_tag in ['h2', 'h3']:
