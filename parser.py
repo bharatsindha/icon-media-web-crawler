@@ -346,6 +346,37 @@ class MenuParser:
             logger.debug("Keyword filtering disabled, returning all keywords")
             return all_keywords
 
+    def extract_homepage_headers(self, html_content: str) -> Set[str]:
+        """
+        Extract all header tags (H1-H6) from homepage.
+
+        Args:
+            html_content: Raw HTML content
+
+        Returns:
+            Set of header text content
+        """
+        if not html_content:
+            return set()
+
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            headers = set()
+
+            # Extract all header tags H1-H6
+            for tag_name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                for header in soup.find_all(tag_name):
+                    text = sanitize_text(header.get_text(strip=True))
+                    if text and len(text) >= 3 and len(text) <= 200:  # Reasonable length
+                        headers.add(text)
+
+            logger.debug(f"Extracted {len(headers)} headers from homepage")
+            return headers
+
+        except Exception as e:
+            logger.error(f"Error extracting homepage headers: {e}")
+            return set()
+
     def get_menu_structure(self, html_content: str) -> dict:
         """
         Get structured information about menus found.
@@ -371,3 +402,72 @@ class MenuParser:
         except Exception as e:
             logger.error(f"Error getting menu structure: {e}")
             return {'menus_found': 0, 'total_items': 0, 'items': []}
+
+    def extract_menu_links(self, html_content: str, base_url: str) -> Set[str]:
+        """
+        Extract all navigation menu link URLs.
+
+        Args:
+            html_content: Raw HTML content
+            base_url: Base URL to resolve relative links
+
+        Returns:
+            Set of absolute menu link URLs
+        """
+        if not html_content:
+            return set()
+
+        try:
+            from urllib.parse import urljoin, urlparse
+            soup = BeautifulSoup(html_content, 'html.parser')
+            menu_urls = set()
+
+            # Find navigation elements using same selectors as menu extraction
+            nav_elements = []
+
+            # Method 1: CSS selectors
+            for selector in self.NAV_SELECTORS:
+                try:
+                    nav_elements.extend(soup.select(selector))
+                except Exception:
+                    continue
+
+            # Method 2: Semantic tags
+            nav_elements.extend(soup.find_all('nav'))
+            nav_elements.extend(soup.find_all('menu'))
+
+            # Method 3: ARIA attributes
+            for attrs in self.NAV_ATTRIBUTES:
+                try:
+                    nav_elements.extend(soup.find_all(attrs=attrs))
+                except Exception:
+                    continue
+
+            # Extract URLs from all navigation elements
+            for nav_element in nav_elements:
+                links = nav_element.find_all('a', href=True)
+                for link in links:
+                    href = link.get('href', '').strip()
+
+                    # Skip empty hrefs, anchors, javascript, mailto, tel
+                    if not href or href.startswith(('#', 'javascript:', 'mailto:', 'tel:')):
+                        continue
+
+                    # Resolve to absolute URL
+                    absolute_url = urljoin(base_url, href)
+
+                    # Only include URLs from the same domain
+                    base_domain = urlparse(base_url).netloc
+                    link_domain = urlparse(absolute_url).netloc
+
+                    if base_domain == link_domain:
+                        # Remove fragments
+                        absolute_url = absolute_url.split('#')[0]
+                        menu_urls.add(absolute_url)
+
+            logger.debug(f"Extracted {len(menu_urls)} unique menu links")
+            return menu_urls
+
+        except Exception as e:
+            logger.error(f"Error extracting menu links: {e}")
+            return set()

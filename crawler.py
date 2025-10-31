@@ -22,7 +22,8 @@ from utils import (
     ProgressTracker,
     build_full_url,
     is_valid_url,
-    check_robots_txt
+    check_robots_txt,
+    sanitize_text
 )
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,39 @@ class WebCrawler:
         })
 
         return session
+
+    def _extract_and_store_page_title(self, html_content: str, company_id: int, url: str) -> None:
+        """
+        Extract and store page title from HTML content.
+
+        Args:
+            html_content: Raw HTML content
+            company_id: Company ID
+            url: Page URL where title was found
+        """
+        try:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html_content, 'html.parser')
+
+            title_tag = soup.find('title')
+            if title_tag:
+                title_text = sanitize_text(title_tag.get_text(strip=True))
+
+                if title_text and len(title_text) >= 3 and len(title_text) <= 200:
+                    section_type_id = self.db.get_section_type_id('page_title')
+                    if section_type_id:
+                        # Store with source URL tracking
+                        keywords_data = {
+                            title_text: {'url': url, 'method': 'title_tag', 'confidence': 1.00}
+                        }
+                        self.db.store_keywords_with_source(
+                            company_id,
+                            keywords_data,
+                            section_type_id
+                        )
+                        logger.debug(f"Stored page title from {url}: {title_text[:50]}...")
+        except Exception as e:
+            logger.debug(f"Error extracting page title from {url}: {e}")
 
     def crawl_domain(self, domain: str, company_id: int) -> Dict:
         """
@@ -159,6 +193,30 @@ class WebCrawler:
                     logger.warning(f"No menu keywords found for {domain}")
                     result['success'] = True  # Still count as success
                     result['pages_crawled'] = 1
+
+                # Extract all header tags from homepage
+                homepage_headers = self.parser.extract_homepage_headers(html_content)
+                if homepage_headers:
+                    section_type_id = self.db.get_section_type_id('homepage_headers')
+                    if section_type_id:
+                        # Convert to keywords_data format with source URL
+                        keywords_data = {
+                            header: {'url': url, 'method': 'header_tag', 'confidence': 0.90}
+                            for header in homepage_headers
+                        }
+                        total_headers, new_headers = self.db.store_keywords_with_source(
+                            company_id,
+                            keywords_data,
+                            section_type_id
+                        )
+                        result['keywords_found'] += total_headers
+                        result['new_keywords'] += new_headers
+                        logger.info(
+                            f"Extracted {total_headers} homepage headers ({new_headers} new)"
+                        )
+
+                # Extract page title from homepage
+                self._extract_and_store_page_title(html_content, company_id, url)
             else:
                 result['pages_failed'] = 1
                 raise ValueError("Failed to fetch page content")
@@ -290,6 +348,9 @@ class WebCrawler:
 
                     result['pages_crawled'] += 1
 
+                    # Extract page title from service page
+                    self._extract_and_store_page_title(service_html, company_id, service_url)
+
                     # Extract keywords based on page type
                     if service_type == 'service_detail':
                         keywords_data = ServicePageExtractor.extract_keywords(service_html, service_url)
@@ -333,6 +394,122 @@ class WebCrawler:
             logger.info(
                 f"Successfully crawled services for {domain}: "
                 f"{total_keywords} keywords ({total_new} new) from {result['pages_crawled']} pages"
+            )
+
+        except requests.exceptions.Timeout:
+            error = f"Request timeout for {domain}"
+            logger.error(error)
+            result['error'] = error
+            result['pages_failed'] += 1
+
+        except requests.exceptions.SSLError as e:
+            error = f"SSL error for {domain}: {str(e)}"
+            logger.error(error)
+            result['error'] = error
+            result['pages_failed'] += 1
+
+        except requests.exceptions.ConnectionError as e:
+            error = f"Connection error for {domain}: {str(e)}"
+            logger.error(error)
+            result['error'] = error
+            result['pages_failed'] += 1
+
+        except requests.exceptions.RequestException as e:
+            error = f"Request error for {domain}: {str(e)}"
+            logger.error(error)
+            result['error'] = error
+            result['pages_failed'] += 1
+
+        except ValueError as e:
+            error = str(e)
+            logger.error(error)
+            result['error'] = error
+
+        except Exception as e:
+            error = f"Unexpected error for {domain}: {str(e)}"
+            logger.error(error, exc_info=True)
+            result['error'] = error
+
+        return result
+
+    def crawl_menu_pages(self, domain: str, company_id: int) -> Dict:
+        """
+        Crawl all navigation menu pages and extract their titles.
+
+        Args:
+            domain: Domain to crawl
+            company_id: Company ID
+
+        Returns:
+            Dictionary with results
+        """
+        result = {
+            'success': False,
+            'pages_crawled': 0,
+            'pages_failed': 0,
+            'titles_found': 0,
+            'new_titles': 0,
+            'error': None
+        }
+
+        try:
+            # Fetch homepage to extract menu links
+            url = f"https://{domain}"
+            page_data = self._fetch_page_with_url(url)
+
+            if not page_data:
+                result['error'] = "Failed to fetch homepage for menu link extraction"
+                result['pages_failed'] = 1
+                return result
+
+            html_content, final_url = page_data
+
+            # Extract all menu links
+            menu_links = self.parser.extract_menu_links(html_content, final_url)
+
+            if not menu_links:
+                logger.info(f"No menu links found for {domain}")
+                result['success'] = True
+                return result
+
+            logger.info(f"Found {len(menu_links)} menu links to crawl for titles")
+
+            # Crawl each menu page and extract title
+            total_titles = 0
+            total_new = 0
+
+            for menu_url in menu_links:
+                try:
+                    self.rate_limiter.wait()
+
+                    # Fetch the page
+                    page_data = self._fetch_page_with_url(menu_url)
+
+                    if not page_data:
+                        result['pages_failed'] += 1
+                        continue
+
+                    page_html, _ = page_data
+                    result['pages_crawled'] += 1
+
+                    # Extract and store page title
+                    self._extract_and_store_page_title(page_html, company_id, menu_url)
+                    total_titles += 1
+
+                    logger.debug(f"Crawled menu page {result['pages_crawled']}/{len(menu_links)}: {menu_url}")
+
+                except Exception as e:
+                    logger.error(f"Error processing menu page {menu_url}: {e}")
+                    result['pages_failed'] += 1
+                    continue
+
+            # Update final results
+            result['titles_found'] = total_titles
+            result['success'] = True
+
+            logger.info(
+                f"Successfully crawled menu pages for {domain}: "
+                f"{total_titles} titles from {result['pages_crawled']} pages"
             )
 
         except requests.exceptions.Timeout:
@@ -607,17 +784,23 @@ class WebCrawler:
             logger.info("Step 2: Extracting service keywords from dedicated pages...")
             service_result = self.crawl_services(normalized_domain, company_id)
 
+            # Step 3: Crawl all menu pages for titles (section_type_id=8)
+            logger.info("Step 3: Extracting page titles from all menu pages...")
+            menu_pages_result = self.crawl_menu_pages(normalized_domain, company_id)
+
             # Combine results from all section types
             result = {
-                'success': menu_result['success'] and service_result['success'],
+                'success': menu_result['success'] and service_result['success'] and menu_pages_result['success'],
                 'menu_keywords': menu_result['keywords_found'],
                 'menu_new': menu_result['new_keywords'],
                 'service_keywords': service_result['keywords_found'],
                 'service_new': service_result['new_keywords'],
                 'service_links_found': service_result['service_links_found'],
-                'pages_crawled': menu_result['pages_crawled'] + service_result['pages_crawled'],
-                'pages_failed': menu_result['pages_failed'] + service_result['pages_failed'],
-                'error': menu_result.get('error') or service_result.get('error'),
+                'menu_titles_found': menu_pages_result['titles_found'],
+                'menu_pages_crawled': menu_pages_result['pages_crawled'],
+                'pages_crawled': menu_result['pages_crawled'] + service_result['pages_crawled'] + menu_pages_result['pages_crawled'],
+                'pages_failed': menu_result['pages_failed'] + service_result['pages_failed'] + menu_pages_result['pages_failed'],
+                'error': menu_result.get('error') or service_result.get('error') or menu_pages_result.get('error'),
                 'keywords_found': menu_result['keywords_found'] + service_result['keywords_found'],
                 'new_keywords': menu_result['new_keywords'] + service_result['new_keywords']
             }
@@ -648,6 +831,10 @@ class WebCrawler:
                 print(f"  Service links:     {result['service_links_found']}")
                 print(f"  Keywords found:    {result['service_keywords']}")
                 print(f"  New keywords:      {result['service_new']}")
+                print()
+                print("Menu Pages (Titles):")
+                print(f"  Pages crawled:     {result['menu_pages_crawled']}")
+                print(f"  Titles found:      {result['menu_titles_found']}")
                 print()
                 print("Total:")
                 print(f"  Keywords found:    {result['keywords_found']}")
