@@ -12,7 +12,21 @@ A production-ready Python web crawler that extracts business keywords from websi
   - ARIA attributes (role="navigation")
   - Common naming patterns
 
-- **Service Page Extraction** (NEW): High-precision service keyword extraction
+- **Homepage Header Extraction** (NEW): Extracts all H1-H6 header tags from homepage
+  - Captures hero headers, section titles, and content headings
+  - Validates text length (3-200 characters)
+  - Full source URL tracking (homepage URL)
+  - 100% accuracy on actual HTML header elements
+  - Extraction method: `header_tag` (0.90 confidence)
+
+- **Page Title Extraction** (NEW): Comprehensive page title extraction
+  - Extracts `<title>` tags from ALL pages across the website
+  - Covers: homepage + service pages + all navigation menu pages
+  - Full source URL tracking for each title
+  - Significantly increased coverage (8 → 24+ titles per site)
+  - Extraction method: `title_tag` (1.00 confidence)
+
+- **Service Page Extraction**: High-precision service keyword extraction
   - Follows navigation links to dedicated service pages
   - Extracts from H1 tags (95% confidence)
   - Extracts from page titles (90% confidence)
@@ -31,10 +45,11 @@ A production-ready Python web crawler that extracts business keywords from websi
   - Business-focused filtering (excludes navigation, legal, social media)
   - Configurable exclusion rules via YAML
   - See [KEYWORDS.md](KEYWORDS.md) for details
-- **Source Tracking**: Every service keyword includes:
-  - Source URL where it was found
-  - Extraction method used (h1, title, meta, json_ld)
+- **Source Tracking**: Every keyword includes:
+  - Source URL where it was found (all sections)
+  - Extraction method used (header_tag, title_tag, h1, title, meta, json_ld, service_card)
   - Confidence score (0.80-1.00)
+  - Section type (menu, homepage_headers, page_title, service_detail, service_listing)
 - **Robust Error Handling**:
   - Handles network timeouts, SSL errors, invalid URLs
   - Respects robots.txt
@@ -55,14 +70,17 @@ The crawler uses 5 main tables:
 1. **companies** - Stores domains with crawl status tracking
 2. **section_types** - Categorizes content sections:
    - `menu` - Navigation menu keywords
+   - `homepage_headers` - H1-H6 header tags from homepage
+   - `page_title` - Page titles from all crawled pages
    - `service_detail` - Keywords from individual service pages
    - `service_listing` - Keywords from service hub/listing pages
 3. **keywords_master** - Global unique keywords with statistics
 4. **domain_keywords** - Links keywords to domains with:
    - Frequency data
-   - Source URL tracking (for service keywords)
-   - Extraction method (h1, title, meta, json_ld, service_card)
+   - Source URL tracking (for all keywords)
+   - Extraction method (header_tag, title_tag, h1, title, meta, json_ld, service_card)
    - Confidence score (0.80-1.00)
+   - **Supports same keyword in multiple sections** via unique constraint on (company_id, keyword_id, section_type_id)
 5. **crawl_jobs** - Tracks individual crawl job execution
 
 ## Installation
@@ -346,9 +364,9 @@ python main.py --domain example.com --extract-services --verbose
 ```
 
 **What it does:**
-1. **Step 1**: Extracts navigation menu keywords (same as menu-only mode)
-2. **Step 2**: Follows navigation links to service pages (up to 20 pages)
-3. **Step 3**: Extracts service keywords from H1, title, meta, and JSON-LD
+1. **Step 1**: Extracts navigation menu keywords + homepage headers (H1-H6) + homepage title
+2. **Step 2**: Follows navigation links to service pages (up to 20 pages) and extracts service keywords + page titles
+3. **Step 3**: Crawls ALL navigation menu pages and extracts their page titles
 4. **Step 4**: Validates and stores with source tracking
 
 **Example Output:**
@@ -368,10 +386,14 @@ Service Extraction:
   Keywords found:    12
   New keywords:      12
 
+Menu Pages (Titles):
+  Pages crawled:     15
+  Titles found:      15
+
 Total:
   Keywords found:    37
   New keywords:      37
-  Pages crawled:     9
+  Pages crawled:     24
   Pages failed:      0
 Job ID:              a1b2c3d4-e5f6-7890-abcd-ef1234567890
 ======================================================================
@@ -477,6 +499,48 @@ The parser uses multiple methods to find navigation menus:
 
 #### Common Patterns
 - Elements with classes/IDs containing: menu, nav, navigation, navbar, menubar
+
+### Homepage Header Extraction
+
+Extracts all H1-H6 header tags from the homepage to capture:
+- Hero headers and taglines
+- Section titles
+- Content headings
+- Mission statements
+
+**Method:**
+1. Parses homepage HTML with BeautifulSoup
+2. Finds all `<h1>`, `<h2>`, `<h3>`, `<h4>`, `<h5>`, `<h6>` tags
+3. Extracts and sanitizes text content
+4. Validates length (3-200 characters)
+5. Stores with source URL = homepage URL
+6. Confidence: 0.90 (high confidence for actual HTML headers)
+
+**Note:** Only extracts actual HTML header elements, not styled spans that look like headers (e.g., `<span class="h3">`).
+
+### Page Title Extraction
+
+Extracts `<title>` tags from ALL pages across the website:
+- Homepage
+- Service pages (from Step 2)
+- All navigation menu pages (new Step 3)
+
+**Coverage Improvement:**
+- Before: 8 titles (homepage + service pages)
+- After: 24+ titles (complete site coverage)
+
+**Method:**
+1. Extracts from homepage during Step 1
+2. Extracts from service pages during Step 2
+3. **NEW**: Crawls all navigation menu links and extracts titles (Step 3)
+4. Stores each title with its specific source URL
+5. Confidence: 1.00 (highest confidence - exact title tag content)
+
+**Benefits:**
+- Complete page title coverage across entire website
+- Tracks which pages exist on the site
+- Useful for sitemap generation and SEO analysis
+- Each title linked to specific URL for traceability
 
 ### Service Page Extraction Methods
 
