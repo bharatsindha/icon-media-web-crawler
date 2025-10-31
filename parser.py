@@ -348,7 +348,12 @@ class MenuParser:
 
     def extract_homepage_headers(self, html_content: str) -> Set[str]:
         """
-        Extract all header tags (H1-H6) from homepage.
+        Extract all header tags (H1-H6) and styled header-like text from homepage.
+
+        Includes:
+        - Traditional H1-H6 tags
+        - Styled elements with header CSS classes
+        - Large text elements (span, div, p with header styling)
 
         Args:
             html_content: Raw HTML content
@@ -363,19 +368,143 @@ class MenuParser:
             soup = BeautifulSoup(html_content, 'html.parser')
             headers = set()
 
-            # Extract all header tags H1-H6
+            # Method 1: Extract all traditional header tags H1-H6
             for tag_name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
                 for header in soup.find_all(tag_name):
                     text = sanitize_text(header.get_text(strip=True))
-                    if text and len(text) >= 3 and len(text) <= 200:  # Reasonable length
+                    if self._is_valid_header_text(text):
                         headers.add(text)
 
-            logger.debug(f"Extracted {len(headers)} headers from homepage")
+            # Method 2: Extract styled headers by CSS class patterns
+            header_class_patterns = [
+                'title', 'heading', 'header', 'headline', 'hero-title', 'hero-heading',
+                'main-title', 'main-heading', 'page-title', 'section-title', 'section-heading',
+                'banner-title', 'intro-title', 'tagline', 'slogan', 'motto'
+            ]
+
+            for element in soup.find_all(['span', 'div', 'p', 'strong']):
+                # Check if element has header-like CSS classes
+                classes = element.get('class', [])
+                class_str = ' '.join(classes).lower() if classes else ''
+
+                # Check for header class patterns
+                is_header_class = any(pattern in class_str for pattern in header_class_patterns)
+
+                if is_header_class:
+                    text = sanitize_text(element.get_text(strip=True))
+                    if self._is_valid_header_text(text) and not self._is_navigation_text(text):
+                        headers.add(text)
+
+            # Method 3: Extract large styled text (font-size indicators)
+            # Look for inline styles or common large text classes
+            large_text_patterns = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'large', 'big', 'xl', 'xxl']
+
+            for element in soup.find_all(['span', 'div', 'p']):
+                classes = element.get('class', [])
+                class_str = ' '.join(classes).lower() if classes else ''
+
+                # Check for large size indicators in class names
+                has_large_class = any(pattern in class_str for pattern in large_text_patterns)
+
+                # Check inline style for large font
+                style = element.get('style', '')
+                has_large_style = 'font-size' in style.lower() and any(
+                    size in style for size in ['px', 'em', 'rem', '%', 'pt']
+                )
+
+                if has_large_class or has_large_style:
+                    text = sanitize_text(element.get_text(strip=True))
+                    if self._is_valid_header_text(text) and not self._is_navigation_text(text):
+                        headers.add(text)
+
+            logger.debug(f"Extracted {len(headers)} headers from homepage (H1-H6 + styled)")
             return headers
 
         except Exception as e:
             logger.error(f"Error extracting homepage headers: {e}")
             return set()
+
+    def _is_valid_header_text(self, text: str) -> bool:
+        """
+        Check if text is valid header content.
+
+        Args:
+            text: Text to validate
+
+        Returns:
+            True if valid header text
+        """
+        if not text:
+            return False
+
+        # Length check: reasonable header length
+        if len(text) < 3 or len(text) > 200:
+            return False
+
+        # Not just numbers or special characters
+        if text.replace(' ', '').replace('-', '').replace('|', '').isdigit():
+            return False
+
+        return True
+
+    def _is_navigation_text(self, text: str) -> bool:
+        """
+        Check if text is likely navigation/menu item rather than header.
+
+        Args:
+            text: Text to check
+
+        Returns:
+            True if likely navigation text or non-header content
+        """
+        text_lower = text.lower().strip()
+
+        # Common navigation/button texts to exclude
+        nav_patterns = [
+            'home', 'about', 'contact', 'services', 'products', 'solutions',
+            'learn more', 'read more', 'view all', 'see all', 'get started',
+            'sign up', 'log in', 'login', 'register', 'search', 'menu',
+            'back to', 'next', 'previous', 'close', 'open', 'toggle',
+            'careers', 'request a quote', 'meet the team', 'our services'
+        ]
+
+        # Exclude if it's a common nav item
+        if text_lower in nav_patterns:
+            return True
+
+        # Exclude if it's very short (likely a button/link)
+        if len(text) <= 15 and text_lower in nav_patterns:
+            return True
+
+        # Exclude if it contains job titles/positions (person names)
+        job_title_indicators = [
+            'manager', 'director', 'president', 'vice president', 'vp',
+            'ceo', 'cfo', 'cto', 'officer', 'engineer', 'technician',
+            'scientist', 'analyst', 'specialist', 'coordinator', 'supervisor',
+            'estimator', 'consultant'
+        ]
+        if any(indicator in text_lower for indicator in job_title_indicators):
+            return True
+
+        # Exclude standalone location/city names (usually short proper nouns)
+        # This catches: "Victoria", "Vancouver", "Nanaimo", etc.
+        words = text.split()
+        if len(words) <= 2 and text[0].isupper() and not any(char in text for char in ['&', '/', '+', '-']):
+            # Check if it's likely a place name (short, capitalized, no descriptive words)
+            descriptive_words = ['environmental', 'assessment', 'consulting', 'services', 'management', 'solutions']
+            if not any(word.lower() in descriptive_words for word in words):
+                return True
+
+        # Exclude company names (contain Inc, Corp, Ltd, LLC, etc.)
+        company_indicators = ['inc', 'corp', 'ltd', 'llc', 'limited', 'incorporated', 'corporation']
+        if any(indicator in text_lower for indicator in company_indicators):
+            return True
+
+        # Exclude dates and years (e.g., "Coast Mountain Resources (2020")
+        if '(' in text and any(year in text for year in ['201', '202']):
+            return True
+
+        return False
 
     def get_menu_structure(self, html_content: str) -> dict:
         """

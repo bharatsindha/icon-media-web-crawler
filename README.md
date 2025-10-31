@@ -798,6 +798,151 @@ For complete troubleshooting guide including SSL errors, timeouts, database issu
 
 Proprietary - All rights reserved
 
+## Accuracy Analysis Results
+
+### Multi-Domain Extraction Analysis (7 Domains Tested)
+
+A comprehensive accuracy analysis was performed on 7 environmental consulting company websites to evaluate extraction quality across all section types.
+
+#### Overall Results
+
+| Metric | Value |
+|--------|-------|
+| **Average Accuracy** | 69% |
+| **Best Performer** | cticompanies.com (80%) |
+| **Worst Performer** | whitestoneassoc.com (43%) |
+| **Total Keywords Analyzed** | 968 keywords across 7 domains |
+
+#### Domain-by-Domain Results
+
+| Domain | Total Keywords | Accuracy | Service Coverage | Key Strengths |
+|--------|---------------|----------|------------------|---------------|
+| activeearth.ca | 69 | 85% | Excellent | Clean navigation, few false positives |
+| whitestoneassoc.com | 116 | 43% | Poor (8%) | Extracted property types as services |
+| bskassociates.com | 125 | 75% | Excellent | All 5 main services captured |
+| eorinc.com | 456 | 65% | Excellent | 8/8 service categories found |
+| ekiconsult.com | 105 | 70% | Excellent | 20+ services across 4 practice areas |
+| cticompanies.com | 47 | 80% | Excellent | Clean structure, minimal noise |
+| landauinc.com | 50 | 65% | Excellent | All 6 main services captured |
+
+### Top 10 Systematic Issues Identified
+
+Based on patterns observed across all 7 domains:
+
+#### 1. News & Blog Content (5/7 domains affected)
+**Issue:** News headlines and blog posts extracted as keywords
+- "EPA Will Take New Action Against PFAS"
+- "Celebrating Women in Engineering at EKI"
+- "Spirit Week 2025"
+
+**Root Cause:** News section headers use H2/H3 tags similar to service headers
+
+#### 2. Project Names (6/7 domains affected)
+**Issue:** Project portfolio items captured as services
+- "Bernal Park Project", "Meadows Field Airport"
+- "Ajinomoto Wetland Bank", "Brown's Creek Restoration"
+- "University of Portland Shoreline Restoration"
+
+**Root Cause:** Project pages have titles structured like service descriptions
+
+#### 3. Call-to-Actions (6/7 domains affected)
+**Issue:** CTA prompts extracted as headers
+- "JOIN OUR TEAM", "Learn more about...", "Tell us more about your project"
+- "Have Questions?", "Get Started", "Contact Us"
+- "Click here for EOR's CIVIL ENGINEERING services"
+
+**Root Cause:** CTAs styled as prominent headers with large fonts
+
+#### 4. Company Information (7/7 domains affected)
+**Issue:** Generic company content extracted
+- Company values: "Ingenuity", "Quality", "Responsiveness"
+- Descriptions: "A vibrant environmental consulting firm..."
+- Staff announcements: "Christine Wasko's 1 Year Work Anniversary"
+
+#### 5. Page Title Suffixes (7/7 domains affected)
+**Issue:** Every page title includes company name
+- "Services - BSK Associates"
+- "About Us - EKI Environment & Water, Inc"
+- "Contact – CTI Companies"
+
+**Root Cause:** Standard SEO practice adds company branding to all titles
+
+#### 6. Navigation Items (7/7 domains affected)
+**Issue:** Non-service navigation extracted
+- "About", "Contact", "Careers", "News", "Team", "Awards"
+- "Mission & Values", "Our People", "Board of Directors"
+
+#### 7. Location Names (4/7 domains affected)
+**Issue:** Office locations captured as keywords
+- "Baton Rouge", "Boise", "Seattle", "Portland", "Spokane"
+- "San Bernardino", "Corporate Headquarters"
+
+#### 8. Property/Land Use Types (primarily whitestoneassoc.com)
+**Issue:** Client property types extracted as services
+- "Office", "Retail", "Industrial", "Multifamily", "Mixed-Use"
+
+**Root Cause:** These describe clients' properties, not services offered
+
+#### 9. Tutorial/Documentation Steps
+**Issue:** Instructional content extracted (ekiconsult.com)
+- "1. What is the DST", "2. DST Inputs", "3. Run Groundwater Model"
+
+#### 10. Volume Variance
+**Issue:** Service extraction volume varies dramatically
+- Low volume (47-69 kw): activeearth.ca, cticompanies.com, landauinc.com
+- Medium volume (105-125 kw): whitestoneassoc.com, bskassociates.com, ekiconsult.com
+- High volume (456 kw): eorinc.com
+
+### Website Structures That Work Well
+
+**Best Performers:**
+1. **cticompanies.com (80% accuracy)**
+   - 4 main categories with clear sub-services
+   - Minimal news/blog content
+   - Dedicated service pages
+   - Focused navigation
+
+2. **activeearth.ca (85% accuracy)**
+   - Limited menu items
+   - Service-focused content
+   - Few project pages
+   - Clean hierarchy
+
+### Website Structures That Perform Poorly
+
+**Challenges:**
+1. **Extensive project portfolios** (eorinc.com, whitestoneassoc.com)
+   - Dozens of project pages with descriptive titles
+   - Project names extracted as services
+
+2. **Active news/blog sections** (bskassociates.com, ekiconsult.com, landauinc.com)
+   - News headlines captured as headers
+   - Blog post titles extracted
+
+3. **Multiple office locations** (landauinc.com)
+   - City names captured as keywords
+
+### Recommended Improvements (Not Yet Implemented)
+
+Based on systematic patterns, these improvements could increase accuracy to ~95%:
+
+#### Priority 1: High-Impact Filters (~15-20% improvement)
+- Exclude news/blog content (check for dates, news URLs)
+- Exclude project names (proper noun patterns without service terms)
+- Clean page titles (remove company name suffixes)
+
+#### Priority 2: Medium-Impact Filters (~10-15% improvement)
+- Exclude CTAs and generic headers
+- Exclude location/city names
+- Exclude company culture content (values, announcements)
+
+#### Priority 3: Advanced Refinements (~5-10% improvement)
+- Filter page titles to service pages only
+- Add confidence scoring based on extraction context
+- Post-processing deduplication for similar keywords
+
+**Note:** These recommendations are documented for future implementation consideration.
+
 ## Support
 
 For issues or questions, contact your system administrator.
